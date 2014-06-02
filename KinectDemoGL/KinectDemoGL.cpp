@@ -22,15 +22,80 @@ Ronald O'Dell and Trevor Hamilton CPSC 456
 #include <NuiSensor.h>
 #include <NuiSkeleton.h>
 
+#include <math.h>
+#include <iostream>
+using namespace std;
+
+
 
 
 GLUquadric* qobj;
 // Camera Postitions, and tons upon tons of vertices. 
-float  xpos = 0.0, ypos = 0.0, xrot = 0.0, yrot = 0.0, zrot = 0.0, scal = 3.0, zpos=0.0;
+float xpos = 0.0; 
+float ypos = 0.0;
+float zpos = 0.0;
 
+float xrot = 0.0;
+float yrot = 0.0;
+float zrot = 0.0; 
 
-int counter=0;
+float scale = 3.0;
+float rotScale = 1.0; //May need different scales for each direction
+float posScale = 5.0;
 
+double PI = 3.14159265358979323846;
+
+//Kinect Vars
+HANDLE depthStream;
+HANDLE rgbStream;
+INuiSensor* sensor;
+Vector4 skeletonPosition[NUI_SKELETON_POSITION_COUNT];
+
+bool initKinect() {
+    // Get a working kinect sensor
+    int numSensors;
+    if (NuiGetSensorCount(&numSensors) < 0 || numSensors < 1) return false;
+    if (NuiCreateSensorByIndex(0, &sensor) < 0) return false;
+
+    // Initialize sensor
+    sensor->NuiInitialize(NUI_INITIALIZE_FLAG_USES_DEPTH_AND_PLAYER_INDEX | NUI_INITIALIZE_FLAG_USES_COLOR | NUI_INITIALIZE_FLAG_USES_SKELETON);
+    sensor->NuiImageStreamOpen(NUI_IMAGE_TYPE_DEPTH_AND_PLAYER_INDEX, // Depth camera or rgb camera?
+        NUI_IMAGE_RESOLUTION_640x480,                // Image resolution
+        0,        // Image stream flags, e.g. near mode
+        2,        // Number of frames to buffer
+        NULL,     // Event handle
+        &depthStream);
+	sensor->NuiImageStreamOpen(NUI_IMAGE_TYPE_COLOR, // Depth camera or rgb camera?
+        NUI_IMAGE_RESOLUTION_640x480,                // Image resolution
+        0,      // Image stream flags, e.g. near mode
+        2,      // Number of frames to buffer
+        NULL,   // Event handle
+		&rgbStream);
+	sensor->NuiSkeletonTrackingEnable(NULL, NUI_SKELETON_TRACKING_FLAG_ENABLE_SEATED_SUPPORT); // NUI_SKELETON_TRACKING_FLAG_ENABLE_SEATED_SUPPORT for only upper body
+    return sensor;
+}
+
+void getSkeletalData() {
+	NUI_SKELETON_FRAME skeletonFrame = {0};
+    if (sensor->NuiSkeletonGetNextFrame(0, &skeletonFrame) >= 0) {
+		sensor->NuiTransformSmooth(&skeletonFrame, NULL);
+		// Loop over all sensed skeletons
+		for (int z = 0; z < NUI_SKELETON_COUNT; ++z) {
+			const NUI_SKELETON_DATA& skeleton = skeletonFrame.SkeletonData[z];
+			// Check the state of the skeleton
+			if (skeleton.eTrackingState == NUI_SKELETON_TRACKED) {			
+				// Copy the joint positions into our array
+				for (int i = 0; i < NUI_SKELETON_POSITION_COUNT; ++i) {
+					skeletonPosition[i] = skeleton.SkeletonPositions[i];
+					if (skeleton.eSkeletonPositionTrackingState[i] == NUI_SKELETON_POSITION_NOT_TRACKED) {
+						skeletonPosition[i].w = 0;
+					}
+				}
+				return; // Only take the data for one skeleton
+			}
+		}
+	}
+}
 
 
 void DrawPart1()
@@ -483,12 +548,12 @@ void DrawPart1()
     // Sorry about this not actually fitting on the computer the whole way. 
     // Last thing I did, couldn't figure out how to get it to fit right. 
    //TEXT? 
-   
+   /*
    char *s1 = "SHALL WE PLAY A GAME?";
    char *s2 = "Love to. How about Global";
    char *s3 = "Thermonuclear War?";
-   char *s4 = "WOUDN'NT YOU PREFER A NICE GAME";
-   char *s5 = "OF MARBLES?";
+   char *s4 = "WOUDN'NT YOU PREFER A";
+   char *s5 = "NICE GAME OF MARBLES?";
    glRasterPos3f(5.0, 4.2, 6.3);
    int count=0;
    for(count=0; count <= strlen(s1); count++)
@@ -524,7 +589,7 @@ void DrawPart1()
     glutBitmapCharacter(GLUT_BITMAP_TIMES_ROMAN_10, s5[count]);        
    }
    //TEXT
-   
+   */
    
    //end cube13 
    //begin cube14
@@ -990,6 +1055,14 @@ void keyboard (unsigned char key, int x, int y) {
 			zpos -= 1;
 			glutPostRedisplay();  
 			break;
+		case 'q': 
+			xpos += 1;
+			glutPostRedisplay();  
+			break;
+		case 'e': 
+			xpos -= 1;
+			glutPostRedisplay();  
+			break;
 
 		case 'W': 
 			zrot += 1;
@@ -1007,44 +1080,72 @@ void keyboard (unsigned char key, int x, int y) {
 			yrot += 1;
 			glutPostRedisplay();  
 			break;
+		case 'Q': 
+			scale -= 1;
+			glutPostRedisplay();  
+			break;
+		case 'E': 
+			scale += 1;
+			glutPostRedisplay();  
+			break;
+		case ' ':
+			glutFullScreen();
+			break;
 
 		default :  printf ("   key = %c -> %d\n", key, key);
    }
 }
+
+void updatePosition(int value)
+{
+ glutPostRedisplay();  
+ glutTimerFunc(16, updatePosition, 1);    
+}
+
 
 void display()
 { 
     glClear(GL_COLOR_BUFFER_BIT|GL_DEPTH_BUFFER_BIT);
     glMatrixMode(GL_MODELVIEW);
     glLoadIdentity();
-    
     gluLookAt(10.0, 1.0, 0.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0);
-    glTranslatef (xpos, ypos, zpos);  // Translations.
- 
-   glRotatef (zrot, 0,0,1);        // Rotations.
-   glRotatef (yrot, 0,1,0);
-   glRotatef (xrot, 1,0,0);
-    glScalef (scal, scal, scal);
-    glTranslatef (-3.0, 0.0, -8.0); 
-   // Sizing.
-        DrawPart1();
-    cylinders();
-  
-    // begin WOPR
-     //begin cube1    
-   //glTranslatef (xpos, ypos, zpos);  // Translations.
- 
-   glRotatef (zrot, 0,0,1);        // Rotations.
-   glRotatef (yrot, 0,1,0);
-   glRotatef (xrot, 1,0,0);
- 
-  
-   // glLoadIdentity();
     
-   // glPushMatrix();
-    //glTranslatef(10.0, 12.0, 8.0);
-    //glPopMatrix();
-        glutSwapBuffers();
+	if(sensor)
+	{
+		getSkeletalData();//grab skeleton data
+		
+		//change based on pos
+		//zpos =  skeletonPosition[NUI_SKELETON_POSITION_HEAD].x * posScale;
+		//ypos = -skeletonPosition[NUI_SKELETON_POSITION_HEAD].y * posScale; //may not need later
+		//xpos = -skeletonPosition[NUI_SKELETON_POSITION_HEAD].z * posScale; //may not need later
+
+		//yrot = ((atan(skeletonPosition[NUI_SKELETON_POSITION_HEAD].x/(-skeletonPosition[NUI_SKELETON_POSITION_HEAD].z)) * 180) / PI) * rotScale;
+		//zrot = -((atan(-skeletonPosition[NUI_SKELETON_POSITION_HEAD].y/(-skeletonPosition[NUI_SKELETON_POSITION_HEAD].z)) * 180) / PI) * rotScale; //may not need later
+		//xrot = -skeletonPosition[NUI_SKELETON_POSITION_HEAD].z * rotScale; //Not applicable
+
+		glRotatef(90, 0, 1, 0);
+		gluLookAt(skeletonPosition[NUI_SKELETON_POSITION_HEAD].z, skeletonPosition[NUI_SKELETON_POSITION_HEAD].y, -skeletonPosition[NUI_SKELETON_POSITION_HEAD].x, 0, 0, 0, 0, 1, 0);
+
+		//add change based on rot and iff statements for both
+
+
+		//possibly add a xpos and xrot together one to see effect
+	}
+	
+	glTranslatef (xpos, ypos, zpos);  // Translations.
+	
+	glRotatef (zrot, 0,0,1);        // Rotations.
+	glRotatef (yrot, 0,1,0);
+	glRotatef (xrot, 1,0,0);
+
+
+    glScalef (scale, scale, scale);
+    glTranslatef (-3.0, 0.0, -8.0); 
+	//Sizing.
+    DrawPart1();
+    cylinders();
+
+	glutSwapBuffers();
     
 }
 
@@ -1054,8 +1155,9 @@ void reshape(int w, int h)
 glViewport(0,0, w, h);
 glMatrixMode(GL_PROJECTION);
 glLoadIdentity();
-glOrtho(-20.0, 20.0, -20.0, 20.0, -20.0, 20.0);
-    
+glOrtho(-20.0, 20.0, -20.0, 20.0, -20.0, 230.0); //Old parralel projection
+//gluPerspective(60, w/h, -20, 230);
+//glFrustum(-20.0, 20.0, -20.0, 20.0, -20.0, 230.0);
 }
 
 
@@ -1072,19 +1174,17 @@ glColor3f(0.0, 0.0, 0.0);
 //get window size, position, and start the functions to draw it all 
 int main(int argc, char** argv)
 {
+	initKinect();
 glutInit(&argc, argv);
 glutInitDisplayMode(GLUT_DOUBLE|GLUT_RGB|GLUT_DEPTH);
 
-glutInitWindowSize(1000, 1000);
+glutInitWindowSize(800, 450);
 glutInitWindowPosition(0, 0);
 glutCreateWindow("WarGames");
 glutDisplayFunc(display);
 glutReshapeFunc(reshape);
 glutKeyboardFunc(keyboard);
 init();
+updatePosition(1);
 glutMainLoop();   
 }
-
-
-
-
