@@ -32,7 +32,7 @@ float zpos = zposOriginal;
 
 float xrotOriginal = 0.0;
 float yrotOriginal = 0.0;
-float zrotOriginal = 0.0; 
+float zrotOriginal = 1.0; 
 
 float xrot = xrotOriginal;
 float yrot = yrotOriginal;
@@ -50,6 +50,11 @@ GLuint texture[TEXTURECOUNT];
 int width[TEXTURECOUNT];
 int height[TEXTURECOUNT];
 
+//Collab 4K tv 142.3 cm Width 80.5 Height
+//Collab Resolution 3840 x 2160
+
+//Laptop 34.5 cm Width 19.5 Height
+//Laptop Resolution 1920 x 1080
 
 
 //Lighting Vars
@@ -61,7 +66,7 @@ GLfloat orange[] = {1.0, 0.5, 0.0, 1.0}; //Orange Color
 GLfloat purple[] = {0.5, 0.0, 0.5, 1.0}; //Purple Color
 GLfloat black[] = {0.0, 0.0, 0.0, 1.0}; //Black Color
 
-GLfloat red[] = {1.0, 0.0, 0.0, 1.0}; //Red Color now unused
+GLfloat red[] = {1.0, 0.0, 0.0, 1.0}; //Red Color
 
 GLfloat white[] = {1.0, 1.0, 1.0, 1.0}; //White Color
 
@@ -295,12 +300,39 @@ void scene()
 
 	glBegin(GL_QUADS);
 		glColor3f(1.0,0.0,0.0);
-		glNormal3d(0, 0, 1);
-		glTexCoord2f(-1.0,-1.0);glVertex3f(-10.0,-1.0,-10.0);
-		glTexCoord2f(-1.0,1.0);glVertex3f(10.0,-1.0,-10.0); 
-		glTexCoord2f(1.0,1.0);glVertex3f(10.0,-1.0,10.0);  
-		glTexCoord2f(1.0,-1.0);glVertex3f(-10.0,-1.0,10.0);
+		//glNormal3d(0, 0, 1);
+		glTexCoord2f(-5.0,-5.0);	glVertex3f(-10.0,-5.0,-10.0);
+		glTexCoord2f(-5.0,5.0);		glVertex3f( 10.0,-5.0,-10.0); 
+		glTexCoord2f(5.0,5.0);		glVertex3f( 10.0,-5.0, 10.0);  
+		glTexCoord2f(5.0,-5.0);		glVertex3f(-10.0,-5.0, 10.0);
     glEnd();
+	glBegin(GL_QUADS);
+		glColor3f(1.0,0.0,0.0);
+		//glNormal3d(0, 0, 1);
+		glTexCoord2f(-5.0,-5.0);	glVertex3f(-10.0, 5.0,-10.0);
+		glTexCoord2f(-5.0,5.0);		glVertex3f( 10.0, 5.0,-10.0); 
+		glTexCoord2f(5.0,5.0);		glVertex3f( 10.0, 5.0, 10.0);  
+		glTexCoord2f(5.0,-5.0);		glVertex3f(-10.0, 5.0, 10.0);
+    glEnd();
+	/*
+	glBegin(GL_QUADS);
+		glColor3f(1.0,0.0,0.0);
+		//glNormal3d(0, 0, 1);
+		glTexCoord2f(-5.0,-5.0);	glVertex3f(-10.0,-1.0,-10.0);
+		glTexCoord2f(-5.0,5.0);		glVertex3f( 10.0,-1.0,-10.0); 
+		glTexCoord2f(5.0,5.0);		glVertex3f( 10.0,-1.0, 10.0);  
+		glTexCoord2f(5.0,-5.0);		glVertex3f(-10.0,-1.0, 10.0);
+    glEnd();
+	glBegin(GL_QUADS);
+		glColor3f(1.0,0.0,0.0);
+		//glNormal3d(0, 0, 1);
+		glTexCoord2f(-5.0,-5.0);	glVertex3f(-10.0,-1.0,-10.0);
+		glTexCoord2f(-5.0,5.0);		glVertex3f( 10.0,-1.0,-10.0); 
+		glTexCoord2f(5.0,5.0);		glVertex3f( 10.0,-1.0, 10.0);  
+		glTexCoord2f(5.0,-5.0);		glVertex3f(-10.0,-1.0, 10.0);
+    glEnd();
+	*/
+
 	glDisable(GL_TEXTURE_2D);
 }
 
@@ -406,26 +438,27 @@ void display()
     glClear(GL_COLOR_BUFFER_BIT|GL_DEPTH_BUFFER_BIT);
     glMatrixMode(GL_MODELVIEW);
     glLoadIdentity();
-    gluLookAt(10.0, 7.0, 0.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0);
+    gluLookAt(10.0, 6.0, 0.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0);
     
 
 	if(sensor)
 	{
+		//do head position update
 		getSkeletalData();//grab skeleton data
-		
+
+				
 		//change based on pos
 		//zpos =  skeletonPosition[NUI_SKELETON_POSITION_HEAD].x * posScale + zposOriginal;
 		//ypos = -skeletonPosition[NUI_SKELETON_POSITION_HEAD].y * posScale + yposOriginal; //may not need later
 		//xpos = -skeletonPosition[NUI_SKELETON_POSITION_HEAD].z * posScale + xposOriginal; //may not need later
 
-		//Change based on rotation
-		yrot = ((atan(skeletonPosition[NUI_SKELETON_POSITION_HEAD].x/(-skeletonPosition[NUI_SKELETON_POSITION_HEAD].z)) * 180) / PI) * rotScale + yrotOriginal;
-		zrot = -((atan(-skeletonPosition[NUI_SKELETON_POSITION_HEAD].y/(-skeletonPosition[NUI_SKELETON_POSITION_HEAD].z)) * 180) / PI) * rotScale + zrotOriginal; //may not need later
-		//xrot = -((atan(-skeletonPosition[NUI_SKELETON_POSITION_HEAD].x/(-skeletonPosition[NUI_SKELETON_POSITION_HEAD].y)) * 180) / PI) * rotScale + zrotOriginal; //Not applicable
+		//change using rotates
+		//yrot = ((atan(skeletonPosition[NUI_SKELETON_POSITION_HEAD].x/(-skeletonPosition[NUI_SKELETON_POSITION_HEAD].z)) * 180) / PI) * rotScale;
+		//zrot = -((atan(-skeletonPosition[NUI_SKELETON_POSITION_HEAD].y/(-skeletonPosition[NUI_SKELETON_POSITION_HEAD].z)) * 180) / PI) * rotScale; //may not need later
 
 		//change using gluLookAt
-		//glRotatef(90, 0, 1, 0);
-		//gluLookAt(skeletonPosition[NUI_SKELETON_POSITION_HEAD].z, -skeletonPosition[NUI_SKELETON_POSITION_HEAD].y, -skeletonPosition[NUI_SKELETON_POSITION_HEAD].x, 0.0, 0, 0, 0, 1, 0);
+		glRotatef(90, 0, 1, 0);
+		gluLookAt(-skeletonPosition[NUI_SKELETON_POSITION_HEAD].z, -skeletonPosition[NUI_SKELETON_POSITION_HEAD].y, skeletonPosition[NUI_SKELETON_POSITION_HEAD].x, -1.0, -0.0, 0.0, 0, 1, 0);
 
 		if(infoToggle)
 		{
@@ -434,16 +467,16 @@ void display()
 		}
 	}
 	
-	glTranslatef (xpos, ypos, zpos);  // Translations.
-	
-	glRotatef (zrot, 0,0,1);        // Rotations.
-	glRotatef (yrot, 0,1,0);
-	glRotatef (xrot, 1,0,0);
+	glTranslatef (xposOriginal, yposOriginal, zposOriginal);  // Translations.
+
+	glRotatef (zrotOriginal + zrot, 0,0,1);        // Rotations.
+	glRotatef (yrotOriginal + yrot, 0,1,0);
+	//glRotatef (xrotOriginal, 1,0,0);
 
 
     glScalef (scale, scale, scale);
     spheres();
-	scene();
+	scene();	
 	//light position needs to rotate
 	glutSwapBuffers();
     
@@ -457,7 +490,7 @@ void reshape(int w, int h)
 	glLoadIdentity();
 	//glOrtho(-20.0, 20.0, -20.0, 20.0, -20.0, 230.0); //Old parallel projection
 	//gluPerspective(10, w/h, 10, 100);
-	glFrustum(-5.0*w/h, 5.0*w/h, -5.0, 5.0, 30.0, 100.0);
+	glFrustum(-1.0*w/h, 1.0*w/h, -1.0, 1.0, 5.0, 2000.0);
 }
 
 
@@ -474,8 +507,12 @@ void init()
 //get window size, position, and start the functions to draw it all 
 int main(int argc, char** argv)
 {
+	cout << "Loading Kinect \n";
 	initKinect();
-	
+	if(!sensor)
+	{
+		cout << "Kinect not found, proceeding to just render scene\n";
+	}
 	glutInit(&argc, argv);
 	glutInitDisplayMode(GLUT_DOUBLE|GLUT_RGB|GLUT_DEPTH);
 	glutInitWindowSize(800, 450);
@@ -484,9 +521,13 @@ int main(int argc, char** argv)
 	glutDisplayFunc(display);
 	glutReshapeFunc(reshape);
 	glutKeyboardFunc(keyboard);
+	
+
+	cout << "Loading Textures \n";
+	initTextures("checkerboard.ppm");
 
 	init();
-	initTextures("checkerboard.ppm");
+
 
 	updatePosition(1);
 	glutMainLoop();   
