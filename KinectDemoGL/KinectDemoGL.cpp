@@ -43,15 +43,14 @@ float rotScale = 1.0; //May need different scales for each direction
 float posScale = 1.0;
 
 //Textures and Normals Vars
+const int TEXTURECOUNT = 1;
 GLUquadric* qobj;
-GLuint *image;
-GLuint texture;
+GLuint* image[TEXTURECOUNT];
+GLuint texture[TEXTURECOUNT];
+int width[TEXTURECOUNT];
+int height[TEXTURECOUNT];
 
-	int o;
-	int m;
-	int c;
-	float n = 0;
-    float s;
+
 
 //Lighting Vars
 GLfloat lightPosition[]    = {0.5, 0, -3.5, 0.5};
@@ -62,7 +61,7 @@ GLfloat orange[] = {1.0, 0.5, 0.0, 1.0}; //Orange Color
 GLfloat purple[] = {0.5, 0.0, 0.5, 1.0}; //Purple Color
 GLfloat black[] = {0.0, 0.0, 0.0, 1.0}; //Black Color
 
-GLfloat redGL[] = {1.0, 0.0, 0.0, 1.0}; //Red Color now unused
+GLfloat red[] = {1.0, 0.0, 0.0, 1.0}; //Red Color now unused
 
 GLfloat white[] = {1.0, 1.0, 1.0, 1.0}; //White Color
 
@@ -79,7 +78,7 @@ Vector4 skeletonPosition[NUI_SKELETON_POSITION_COUNT];
 
 //Generic Vars
 bool infoToggle = false;
-double PI = 3.14159265358979323846;
+const double PI = 3.14159265358979323846;
 
 
 bool initKinect() {
@@ -128,60 +127,79 @@ void getSkeletalData() {
 	}
 }
 
-void initTextures(char* FileName)
+void initTextures(char FileName[256])
 {
-	//Code from CPSC 456 class at SRU originally written in C and adpoted to C++ 
-    
-	FILE *fd;
-    int k, nm;
-    int i;
-    char b[256];
-    int redPixel, greenPixel, bluePixel;
-	char c;
-    fd = fopen("C:\\Users\\tjhrulz\\checkerboard.ppm", "r");
-    // check first line for P3
-    fscanf(fd, "%[^\n]", b);
-    if (b[0] != 'P' || b[1] != '3') {
-             printf("%s is not a PPM file\n", b);
-             system("pause");
-             exit(0);
-             }
-    // skip comments
-    fscanf(fd, "%c%c", &c, &c);
-    while (c == '#') {
-          fscanf(fd, "%[^\n]", b);
-          fscanf(fd, "%c%c", &c, &c);
-    }
-    
-    // put back first character of first non-comment line
-    ungetc(c, fd);
-    // read file info
-    fscanf(fd, "%d %d %d", &o, &m, &k);
-    
-    nm = o * m; // overall size
-    
-    image = (GLuint*) malloc(3*sizeof(GLuint)*nm);
-    
-    s = 255./k;
-    
-    for (i=0; i < (nm); i++) {
-        fscanf(fd, "%d %d %d", &redPixel, &greenPixel, &bluePixel);
-        image[3*nm - 3*i - 3] = redPixel;
-        image[3*nm - 3*i - 2] = greenPixel;
-        image[3*nm - 3*i - 1] = bluePixel;
-        printf("(%d, %d, %d)\n", redPixel, greenPixel, bluePixel);
-        //system("pause");
-    }
+	//Code from CPSC 456 class at SRU originally written in C and adopted to C++ 
+   
+	for(int count = 0; count < TEXTURECOUNT; count++)
+	{
+		float n = 0;
+		float s;
 
-	glGenTextures(1, &texture);
-	glBindTexture(GL_TEXTURE_2D, texture);
 
-    glPixelTransferf(GL_RED_SCALE, s);
-    glPixelTransferf(GL_GREEN_SCALE, s);
-    glPixelTransferf(GL_BLUE_SCALE, s);
-    glPixelStorei(GL_UNPACK_SWAP_BYTES, GL_TRUE);
-    glPixelStorei(GL_UNPACK_ALIGNMENT, 1);
+		FILE *fd;
+		int k, nm;
+		int i;
+		char b[256];
+		for(int j = 0; j < 256; j++)
+		{
+			 b[j]= FileName[j];
+		}
+		int redPixel, greenPixel, bluePixel;
+		char c;
+		fd = fopen(FileName, "r");
+		if(fd == NULL)
+		{
+			printf("%s is not in current directory\n", b);
+			system("pause");
+		}
+		// check first line for P3
+		fscanf(fd, "%[^\n]", b);
+		
+		if (b[0] != 'P' || b[1] != '3') {
+				 printf("%s is not a PPM file\n", b);
+				 system("pause");
+				 exit(0);
+				 }
+		// skip comments
+		fscanf(fd, "%c%c", &c, &c);
+		while (c == '#') {
+			  fscanf(fd, "%[^\n]", b);
+			  fscanf(fd, "%c%c", &c, &c);
+		}
+    
+		// put back first character of first non-comment line
+		ungetc(c, fd);
+		// read file info
+		fscanf(fd, "%d %d %d", &width, &height, &k);
+    
+		nm = width[count] * height[count]; // overall size
+    
+		image[count] = (GLuint*) malloc(3*sizeof(GLuint)*nm);
+    
+		s = 255./k;
+    
+		for (i=0; i < (nm); i++) 
+		{
+			fscanf(fd, "%d %d %d", &redPixel, &greenPixel, &bluePixel);
+			image[count][3*nm - 3*i - 3] = redPixel;
+			image[count][3*nm - 3*i - 2] = greenPixel;
+			image[count][3*nm - 3*i - 1] = bluePixel;
+			//printf("(%d, %d, %d)\n", redPixel, greenPixel, bluePixel);
+			//system("pause");
+		}
+
+		glGenTextures(1, &texture[count]);
+		glBindTexture(GL_TEXTURE_2D, texture[count]);
+
+		glPixelTransferf(GL_RED_SCALE, s);
+		glPixelTransferf(GL_GREEN_SCALE, s);
+		glPixelTransferf(GL_BLUE_SCALE, s);
+		glPixelStorei(GL_UNPACK_SWAP_BYTES, GL_TRUE);
+		glPixelStorei(GL_UNPACK_ALIGNMENT, 1);
+	}
 }
+
 
 
 void spheres()
@@ -251,20 +269,37 @@ void spheres()
 
 void scene()
 {
+    glEnable(GL_LIGHTING);
+    glEnable(GL_LIGHT0);
+
+	glLightfv(GL_LIGHT0, GL_AMBIENT, ambientLight);
+    glLightfv(GL_LIGHT0, GL_DIFFUSE, diffuseLight);
+    glLightfv(GL_LIGHT0, GL_SPECULAR, specularLight);
+    
+    // Set the light position
+    glLightfv(GL_LIGHT0, GL_POSITION, lightPosition);
+
+	//Set light color
+	glMaterialfv(GL_FRONT_AND_BACK, GL_SPECULAR, white);
+	glMaterialf(GL_FRONT_AND_BACK, GL_SHININESS, 20);
+
+	glMaterialfv(GL_FRONT_AND_BACK, GL_AMBIENT, red);
+	glMaterialfv(GL_FRONT_AND_BACK, GL_DIFFUSE, red);
+
 	glEnable(GL_TEXTURE_2D);
-    glTexImage2D(GL_TEXTURE_2D, 0, 3, o, m, 0, GL_RGB, GL_UNSIGNED_INT, image);
+    glTexImage2D(GL_TEXTURE_2D, 0, 3, width[0], height[0], 0, GL_RGB, GL_UNSIGNED_INT, image[0]);
     glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
     glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
     glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
     glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
 
 	glBegin(GL_QUADS);
-		glNormal3d(0, 1, 0);
 		glColor3f(1.0,0.0,0.0);
-		glTexCoord2f(1.0,-1.0);glVertex3f(-10.0,-1.0,10.0);
+		glNormal3d(0, 0, 1);
 		glTexCoord2f(-1.0,-1.0);glVertex3f(-10.0,-1.0,-10.0);
 		glTexCoord2f(-1.0,1.0);glVertex3f(10.0,-1.0,-10.0); 
 		glTexCoord2f(1.0,1.0);glVertex3f(10.0,-1.0,10.0);  
+		glTexCoord2f(1.0,-1.0);glVertex3f(-10.0,-1.0,10.0);
     glEnd();
 	glDisable(GL_TEXTURE_2D);
 }
@@ -420,7 +455,7 @@ void reshape(int w, int h)
 	glViewport(0,0, w, h);
 	glMatrixMode(GL_PROJECTION);
 	glLoadIdentity();
-	//glOrtho(-20.0, 20.0, -20.0, 20.0, -20.0, 230.0); //Old parralel projection
+	//glOrtho(-20.0, 20.0, -20.0, 20.0, -20.0, 230.0); //Old parallel projection
 	//gluPerspective(10, w/h, 10, 100);
 	glFrustum(-5.0*w/h, 5.0*w/h, -5.0, 5.0, 30.0, 100.0);
 }
