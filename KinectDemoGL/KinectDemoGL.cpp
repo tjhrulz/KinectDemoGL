@@ -1,9 +1,3 @@
-/*
-Ronald O'Dell and Trevor Hamilton CPSC 456
-*/
-
-
-
 #include "stdafx.h"
 
 #include <string.h>
@@ -27,10 +21,7 @@ Ronald O'Dell and Trevor Hamilton CPSC 456
 using namespace std;
 
 
-
-
-GLUquadric* qobj;
-// Camera Postitions, and tons upon tons of vertices. 
+// Camera Postition Vars
 float xposOriginal = -25.0; 
 float yposOriginal = -15.0;
 float zposOriginal = 0.0;
@@ -51,9 +42,18 @@ float scale = 1.0;
 float rotScale = 1.0; //May need different scales for each direction
 float posScale = 1.0;
 
-bool infoToggle = false;
-double PI = 3.14159265358979323846;
+//Textures and Normals Vars
+GLUquadric* qobj;
+GLuint *image;
+GLuint texture;
 
+	int o;
+	int m;
+	int c;
+	float n = 0;
+    float s;
+
+//Lighting Vars
 GLfloat lightPosition[]    = {0.5, 0, -3.5, 0.5};
 
 GLfloat green[] = {0.0, 1.0, 0.0, 1.0}; //Green Color
@@ -62,8 +62,13 @@ GLfloat orange[] = {1.0, 0.5, 0.0, 1.0}; //Orange Color
 GLfloat purple[] = {0.5, 0.0, 0.5, 1.0}; //Purple Color
 GLfloat black[] = {0.0, 0.0, 0.0, 1.0}; //Black Color
 
+GLfloat redGL[] = {1.0, 0.0, 0.0, 1.0}; //Red Color now unused
+
 GLfloat white[] = {1.0, 1.0, 1.0, 1.0}; //White Color
 
+GLfloat ambientLight[]    = {0.2, 0.2, 0.2, 1.0};
+GLfloat diffuseLight[]    = {0.8, 0.8, 0.8, 1.0};
+GLfloat specularLight[]    = {1.0, 1.0, 1.0, 1.0};
 
 
 //Kinect Vars
@@ -71,6 +76,11 @@ HANDLE depthStream;
 HANDLE rgbStream;
 INuiSensor* sensor;
 Vector4 skeletonPosition[NUI_SKELETON_POSITION_COUNT];
+
+//Generic Vars
+bool infoToggle = false;
+double PI = 3.14159265358979323846;
+
 
 bool initKinect() {
     // Get a working kinect sensor
@@ -118,6 +128,61 @@ void getSkeletalData() {
 	}
 }
 
+void initTextures(char* FileName)
+{
+	//Code from CPSC 456 class at SRU originally written in C and adpoted to C++ 
+    
+	FILE *fd;
+    int k, nm;
+    int i;
+    char b[256];
+    int redPixel, greenPixel, bluePixel;
+	char c;
+    fd = fopen("C:\\Users\\tjhrulz\\checkerboard.ppm", "r");
+    // check first line for P3
+    fscanf(fd, "%[^\n]", b);
+    if (b[0] != 'P' || b[1] != '3') {
+             printf("%s is not a PPM file\n", b);
+             system("pause");
+             exit(0);
+             }
+    // skip comments
+    fscanf(fd, "%c%c", &c, &c);
+    while (c == '#') {
+          fscanf(fd, "%[^\n]", b);
+          fscanf(fd, "%c%c", &c, &c);
+    }
+    
+    // put back first character of first non-comment line
+    ungetc(c, fd);
+    // read file info
+    fscanf(fd, "%d %d %d", &o, &m, &k);
+    
+    nm = o * m; // overall size
+    
+    image = (GLuint*) malloc(3*sizeof(GLuint)*nm);
+    
+    s = 255./k;
+    
+    for (i=0; i < (nm); i++) {
+        fscanf(fd, "%d %d %d", &redPixel, &greenPixel, &bluePixel);
+        image[3*nm - 3*i - 3] = redPixel;
+        image[3*nm - 3*i - 2] = greenPixel;
+        image[3*nm - 3*i - 1] = bluePixel;
+        printf("(%d, %d, %d)\n", redPixel, greenPixel, bluePixel);
+        //system("pause");
+    }
+
+	glGenTextures(1, &texture);
+	glBindTexture(GL_TEXTURE_2D, texture);
+
+    glPixelTransferf(GL_RED_SCALE, s);
+    glPixelTransferf(GL_GREEN_SCALE, s);
+    glPixelTransferf(GL_BLUE_SCALE, s);
+    glPixelStorei(GL_UNPACK_SWAP_BYTES, GL_TRUE);
+    glPixelStorei(GL_UNPACK_ALIGNMENT, 1);
+}
+
 
 void spheres()
 {
@@ -126,9 +191,7 @@ void spheres()
     glEnable(GL_LIGHT0);
 
 	// Set lighting intensity
-	GLfloat ambientLight[]    = {0.2, 0.2, 0.2, 1.0};
-	GLfloat diffuseLight[]    = {0.8, 0.8, 0.8, 1.0};
-	GLfloat specularLight[]    = {1.0, 1.0, 1.0, 1.0};
+
 
 	glLightfv(GL_LIGHT0, GL_AMBIENT, ambientLight);
     glLightfv(GL_LIGHT0, GL_DIFFUSE, diffuseLight);
@@ -183,6 +246,27 @@ void spheres()
 
     glDisable(GL_LIGHTING);
     glDisable(GL_LIGHT0);
+
+}
+
+void scene()
+{
+	glEnable(GL_TEXTURE_2D);
+    glTexImage2D(GL_TEXTURE_2D, 0, 3, o, m, 0, GL_RGB, GL_UNSIGNED_INT, image);
+    glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
+    glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
+    glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+    glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+
+	glBegin(GL_QUADS);
+		glNormal3d(0, 1, 0);
+		glColor3f(1.0,0.0,0.0);
+		glTexCoord2f(1.0,-1.0);glVertex3f(-10.0,-1.0,10.0);
+		glTexCoord2f(-1.0,-1.0);glVertex3f(-10.0,-1.0,-10.0);
+		glTexCoord2f(-1.0,1.0);glVertex3f(10.0,-1.0,-10.0); 
+		glTexCoord2f(1.0,1.0);glVertex3f(10.0,-1.0,10.0);  
+    glEnd();
+	glDisable(GL_TEXTURE_2D);
 }
 
 void keyboard (unsigned char key, int x, int y) {
@@ -324,6 +408,7 @@ void display()
 
     glScalef (scale, scale, scale);
     spheres();
+	scene();
 	//light position needs to rotate
 	glutSwapBuffers();
     
@@ -355,16 +440,19 @@ void init()
 int main(int argc, char** argv)
 {
 	initKinect();
+	
 	glutInit(&argc, argv);
 	glutInitDisplayMode(GLUT_DOUBLE|GLUT_RGB|GLUT_DEPTH);
-	
 	glutInitWindowSize(800, 450);
 	glutInitWindowPosition(0, 0);
 	glutCreateWindow("WarGames");
 	glutDisplayFunc(display);
 	glutReshapeFunc(reshape);
 	glutKeyboardFunc(keyboard);
+
 	init();
+	initTextures("checkerboard.ppm");
+
 	updatePosition(1);
 	glutMainLoop();   
 }
