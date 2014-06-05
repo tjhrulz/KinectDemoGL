@@ -21,6 +21,18 @@
 using namespace std;
 
 
+const int TEXTURECOUNT = 1;
+const double PI = 3.14159265358979323846;
+const float screenWidthCm = 142.3;
+const float screenHeightCm = 80.5;
+//Collab 4K tv 142.3 cm Width 80.5 Height
+//Collab Resolution 3840 x 2160
+
+//Laptop 34.5 cm Width 19.5 Height
+//Laptop Resolution 1920 x 1080
+//In centimeters
+
+
 // Camera Postition Vars
 float xposOriginal = -25.0; 
 float yposOriginal = -15.0;
@@ -43,22 +55,14 @@ float rotScale = 1.0; //May need different scales for each direction
 float posScale = 1.0;
 
 //Textures and Normals Vars
-const int TEXTURECOUNT = 1;
 GLUquadric* qobj;
 GLuint* image[TEXTURECOUNT];
 GLuint texture[TEXTURECOUNT];
-int width[TEXTURECOUNT];
-int height[TEXTURECOUNT];
-
-//Collab 4K tv 142.3 cm Width 80.5 Height
-//Collab Resolution 3840 x 2160
-
-//Laptop 34.5 cm Width 19.5 Height
-//Laptop Resolution 1920 x 1080
-
+int textureWidth[TEXTURECOUNT];
+int textureHeight[TEXTURECOUNT];
 
 //Lighting Vars
-GLfloat lightPosition[]    = {0.5, 0, -3.5, 0.5};
+GLfloat lightPosition[]    = {20, 10, 4, 0.0};
 
 GLfloat green[] = {0.0, 1.0, 0.0, 1.0}; //Green Color
 GLfloat blue[] = {0.0, 0.0, 1.0, 1.0}; //Blue Color
@@ -83,8 +87,60 @@ Vector4 skeletonPosition[NUI_SKELETON_POSITION_COUNT];
 
 //Generic Vars
 bool infoToggle = false;
-const double PI = 3.14159265358979323846;
 
+
+//Collab 4K tv 142.3 cm Width 80.5 Height
+//Collab Resolution 3840 x 2160
+
+//Laptop 34.5 cm Width 19.5 Height
+//Laptop Resolution 1920 x 1080
+//In centimeters
+
+
+float pixelWidth;
+float pixelHeight;
+float pixelRatio;
+
+//Originally in Meters once stored here they are in Centimeters
+float worldHeadLocX; //May need original values scaled to fit coords
+float worldHeadLocY;
+float worldHeadLocZ;
+
+
+void doCameraUpdate()
+{
+	
+	float worldScreenTopLeftLocX = -screenWidthCm/2; 
+	float worldScreenTopLeftLocY = -screenHeightCm/2; 
+	float worldScreenTopLeftLocZ = 0; 
+
+	float worldScreenBottomRightLocX = screenWidthCm/2;
+	float worldScreenBottomRightLocY = screenHeightCm/2;
+	float worldScreenBottomRightLocZ = 0;
+
+	float virtualScreenTopLeftLocX = worldScreenTopLeftLocX - worldHeadLocX;
+	float virtualScreenTopLeftLocY = worldScreenTopLeftLocY - worldHeadLocY;
+	float virtualScreenTopLeftLocZ = worldScreenTopLeftLocZ - worldHeadLocZ;
+
+	float virtualScreenBottomRightLocX =  worldScreenBottomRightLocX - worldHeadLocX;
+	float virtualScreenBottomRightLocY =  worldScreenBottomRightLocY - worldHeadLocY;
+	float virtualScreenBottomRightLocZ =  worldScreenBottomRightLocZ - worldHeadLocZ;
+
+	float worldFarPlane = 2000.0; //in cm
+	float virtualNearPlane = 5.0;
+	float virtualFarPlane = worldFarPlane - worldHeadLocZ;
+
+	float virtualNearTopLeftLocX = virtualNearPlane/virtualScreenTopLeftLocZ*virtualScreenTopLeftLocX;
+	float virtualNearTopLeftLocY = virtualNearPlane/virtualScreenTopLeftLocZ*virtualScreenTopLeftLocY;
+	float virtualNearTopLeftLocZ = virtualNearPlane/virtualScreenTopLeftLocZ*virtualScreenTopLeftLocZ;
+
+	float virtualNearBottomRightLocX = virtualScreenBottomRightLocX / virtualScreenBottomRightLocZ * virtualNearPlane;
+	float virtualNearBottomRightLocY = virtualScreenBottomRightLocY / virtualScreenBottomRightLocZ * virtualNearPlane;
+	float virtualNearBottomRightLocZ = virtualScreenBottomRightLocZ / virtualScreenBottomRightLocZ * virtualNearPlane;
+	
+
+	glFrustum(virtualNearTopLeftLocX, virtualNearBottomRightLocX, -virtualNearBottomRightLocY, -virtualNearTopLeftLocY, virtualNearPlane, virtualFarPlane);
+}
 
 bool initKinect() {
     // Get a working kinect sensor
@@ -176,9 +232,9 @@ void initTextures(char FileName[256])
 		// put back first character of first non-comment line
 		ungetc(c, fd);
 		// read file info
-		fscanf(fd, "%d %d %d", &width, &height, &k);
+		fscanf(fd, "%d %d %d", &textureWidth, &textureHeight, &k);
     
-		nm = width[count] * height[count]; // overall size
+		nm = textureWidth[count] * textureHeight[count]; // overall size
     
 		image[count] = (GLuint*) malloc(3*sizeof(GLuint)*nm);
     
@@ -262,8 +318,16 @@ void spheres()
 	glMaterialfv(GL_FRONT_AND_BACK, GL_AMBIENT, black);
 	glMaterialfv(GL_FRONT_AND_BACK, GL_DIFFUSE, black);
 	glPushMatrix();
-		glColor3f(0, 0.0, 0); //black
+		glColor3f(0.0, 0.0, 0.0); //black
 		glTranslatef (0.0, 0.0, -5.0); 
+		glutSolidSphere(1, 100, 100);
+	glPopMatrix();   
+
+	glMaterialfv(GL_FRONT_AND_BACK, GL_AMBIENT, red);
+	glMaterialfv(GL_FRONT_AND_BACK, GL_DIFFUSE, red);
+	glPushMatrix();
+		glColor3f(1.0, 0.0, 0.0); //red
+		glTranslatef (20.0, 0.0, 0.0); 
 		glutSolidSphere(1, 100, 100);
 	glPopMatrix();   
 
@@ -292,7 +356,7 @@ void scene()
 	glMaterialfv(GL_FRONT_AND_BACK, GL_DIFFUSE, red);
 
 	glEnable(GL_TEXTURE_2D);
-    glTexImage2D(GL_TEXTURE_2D, 0, 3, width[0], height[0], 0, GL_RGB, GL_UNSIGNED_INT, image[0]);
+    glTexImage2D(GL_TEXTURE_2D, 0, 3, textureWidth[0], textureHeight[0], 0, GL_RGB, GL_UNSIGNED_INT, image[0]);
     glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
     glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
     glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
@@ -300,39 +364,25 @@ void scene()
 
 	glBegin(GL_QUADS);
 		glColor3f(1.0,0.0,0.0);
-		//glNormal3d(0, 0, 1);
-		glTexCoord2f(-5.0,-5.0);	glVertex3f(-10.0,-5.0,-10.0);
-		glTexCoord2f(-5.0,5.0);		glVertex3f( 10.0,-5.0,-10.0); 
-		glTexCoord2f(5.0,5.0);		glVertex3f( 10.0,-5.0, 10.0);  
-		glTexCoord2f(5.0,-5.0);		glVertex3f(-10.0,-5.0, 10.0);
-    glEnd();
-	glBegin(GL_QUADS);
-		glColor3f(1.0,0.0,0.0);
-		//glNormal3d(0, 0, 1);
-		glTexCoord2f(-5.0,-5.0);	glVertex3f(-10.0, 5.0,-10.0);
-		glTexCoord2f(-5.0,5.0);		glVertex3f( 10.0, 5.0,-10.0); 
-		glTexCoord2f(5.0,5.0);		glVertex3f( 10.0, 5.0, 10.0);  
-		glTexCoord2f(5.0,-5.0);		glVertex3f(-10.0, 5.0, 10.0);
+		glNormal3d(0, 0, 1);
+		glTexCoord2f(-5.0,-5.0);	glVertex3f(-50.0,-1.0,-20.0);
+		glTexCoord2f(-5.0,5.0);		glVertex3f( 50.0,-1.0,-20.0); 
+		glTexCoord2f(5.0,5.0);		glVertex3f( 50.0,-1.0, 20.0);  
+		glTexCoord2f(5.0,-5.0);		glVertex3f(-50.0,-1.0, 20.0);
     glEnd();
 	/*
-	glBegin(GL_QUADS);
-		glColor3f(1.0,0.0,0.0);
-		//glNormal3d(0, 0, 1);
-		glTexCoord2f(-5.0,-5.0);	glVertex3f(-10.0,-1.0,-10.0);
-		glTexCoord2f(-5.0,5.0);		glVertex3f( 10.0,-1.0,-10.0); 
-		glTexCoord2f(5.0,5.0);		glVertex3f( 10.0,-1.0, 10.0);  
-		glTexCoord2f(5.0,-5.0);		glVertex3f(-10.0,-1.0, 10.0);
-    glEnd();
-	glBegin(GL_QUADS);
-		glColor3f(1.0,0.0,0.0);
-		//glNormal3d(0, 0, 1);
-		glTexCoord2f(-5.0,-5.0);	glVertex3f(-10.0,-1.0,-10.0);
-		glTexCoord2f(-5.0,5.0);		glVertex3f( 10.0,-1.0,-10.0); 
-		glTexCoord2f(5.0,5.0);		glVertex3f( 10.0,-1.0, 10.0);  
-		glTexCoord2f(5.0,-5.0);		glVertex3f(-10.0,-1.0, 10.0);
-    glEnd();
-	*/
+	//Draw box out to infinity
+	glDisable(GL_DEPTH_TEST);
+	glDepthMask(false);
+	glPushMatrix();
 
+
+
+	
+	glPopMatrix();
+	glDepthMask(true);
+	glEnable(GL_DEPTH_TEST);
+	*/
 	glDisable(GL_TEXTURE_2D);
 }
 
@@ -438,6 +488,7 @@ void display()
     glClear(GL_COLOR_BUFFER_BIT|GL_DEPTH_BUFFER_BIT);
     glMatrixMode(GL_MODELVIEW);
     glLoadIdentity();
+	doCameraUpdate();
     gluLookAt(10.0, 6.0, 0.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0);
     
 
@@ -446,7 +497,7 @@ void display()
 		//do head position update
 		getSkeletalData();//grab skeleton data
 
-				
+		//Old code each track type seperated by new line, rot was the most tested		
 		//change based on pos
 		//zpos =  skeletonPosition[NUI_SKELETON_POSITION_HEAD].x * posScale + zposOriginal;
 		//ypos = -skeletonPosition[NUI_SKELETON_POSITION_HEAD].y * posScale + yposOriginal; //may not need later
@@ -457,12 +508,17 @@ void display()
 		//zrot = -((atan(-skeletonPosition[NUI_SKELETON_POSITION_HEAD].y/(-skeletonPosition[NUI_SKELETON_POSITION_HEAD].z)) * 180) / PI) * rotScale; //may not need later
 
 		//change using gluLookAt
-		glRotatef(90, 0, 1, 0);
-		gluLookAt(-skeletonPosition[NUI_SKELETON_POSITION_HEAD].z, -skeletonPosition[NUI_SKELETON_POSITION_HEAD].y, skeletonPosition[NUI_SKELETON_POSITION_HEAD].x, -1.0, -0.0, 0.0, 0, 1, 0);
+		//glRotatef(90, 0, 1, 0);
+		//gluLookAt(skeletonPosition[NUI_SKELETON_POSITION_HEAD].z, skeletonPosition[NUI_SKELETON_POSITION_HEAD].y, -skeletonPosition[NUI_SKELETON_POSITION_HEAD].x, 0.0, 0.0, 0.0, 0, 1, 0);
+
+		//get real world coords and store them appropriately 
+		worldHeadLocX = skeletonPosition[NUI_SKELETON_POSITION_HEAD].x * 10; //grab head positions and convert to cmgu
+		worldHeadLocY = skeletonPosition[NUI_SKELETON_POSITION_HEAD].y * 10 - 4;		
+		worldHeadLocZ = skeletonPosition[NUI_SKELETON_POSITION_HEAD].z * 10;
 
 		if(infoToggle)
 		{
-			cout << skeletonPosition[NUI_SKELETON_POSITION_HEAD].x << "      " << -skeletonPosition[NUI_SKELETON_POSITION_HEAD].y << "      " << -skeletonPosition[NUI_SKELETON_POSITION_HEAD].z << endl;
+			cout << worldHeadLocX << "      " << worldHeadLocY << "      " << worldHeadLocZ << endl;
 	
 		}
 	}
@@ -471,7 +527,7 @@ void display()
 
 	glRotatef (zrotOriginal + zrot, 0,0,1);        // Rotations.
 	glRotatef (yrotOriginal + yrot, 0,1,0);
-	//glRotatef (xrotOriginal, 1,0,0);
+	glRotatef (xrotOriginal, 1,0,0);
 
 
     glScalef (scale, scale, scale);
@@ -485,12 +541,16 @@ void display()
 // reshapes window, gives the actual size of the xzy coordinate units
 void reshape(int w, int h)
 {
+	pixelWidth = w;
+	pixelHeight = h;
+	pixelRatio = w/h;
 	glViewport(0,0, w, h);
 	glMatrixMode(GL_PROJECTION);
 	glLoadIdentity();
 	//glOrtho(-20.0, 20.0, -20.0, 20.0, -20.0, 230.0); //Old parallel projection
 	//gluPerspective(10, w/h, 10, 100);
-	glFrustum(-1.0*w/h, 1.0*w/h, -1.0, 1.0, 5.0, 2000.0);
+	//glFrustum(-1.0*w/h, 1.0*w/h, -1.0, 1.0, 5.0, 2000.0);
+	//glFrustum(nearPlane * (-fov * pixelRatio + 1), nearPlane * (fov * pixelRatio + 1), nearPlane * (-fov + .5), nearPlane * (fov + .5), nearPlane, farPlane);
 }
 
 
