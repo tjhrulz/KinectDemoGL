@@ -23,8 +23,8 @@ using namespace std;
 
 const int TEXTURECOUNT = 1;
 const double PI = 3.14159265358979323846;
-const float screenWidthCm = 142.3;
-const float screenHeightCm = 80.5;
+const float screenWidthCm = 34.5;
+const float screenHeightCm = 19.5;
 //Collab 4K tv 142.3 cm Width 80.5 Height
 //Collab Resolution 3840 x 2160
 
@@ -34,8 +34,8 @@ const float screenHeightCm = 80.5;
 
 
 // Camera Postition Vars
-float xposOriginal = -25.0; 
-float yposOriginal = -15.0;
+float xposOriginal = 0.0; 
+float yposOriginal = 0.0;
 float zposOriginal = 0.0;
 
 float xpos = xposOriginal; 
@@ -44,7 +44,7 @@ float zpos = zposOriginal;
 
 float xrotOriginal = 0.0;
 float yrotOriginal = 0.0;
-float zrotOriginal = 1.0; 
+float zrotOriginal = 0.0; 
 
 float xrot = xrotOriginal;
 float yrot = yrotOriginal;
@@ -95,18 +95,26 @@ bool infoToggle = false;
 //Laptop 34.5 cm Width 19.5 Height
 //Laptop Resolution 1920 x 1080
 //In centimeters
-
-
-float pixelWidth;
-float pixelHeight;
+int pixelWidth;
+int pixelHeight;
 float pixelRatio;
 
 //Originally in Meters once stored here they are in Centimeters
-float worldHeadLocX; //May need original values scaled to fit coords
-float worldHeadLocY;
-float worldHeadLocZ;
+float worldHeadLocX = 0; //May need original values scaled to fit coords
+float worldHeadLocY = 0;
+float worldHeadLocZ = 0;
+
+float virtualNearTopLeftLocX;
+float virtualNearTopLeftLocY;
+
+float virtualNearBottomRightLocX;
+float virtualNearBottomRightLocY;
 
 
+float worldFarPlane = 2000.0; //in cm
+float virtualNearPlane = 5.0;
+float virtualFarPlane;
+/*
 void doCameraUpdate()
 {
 	
@@ -126,23 +134,48 @@ void doCameraUpdate()
 	float virtualScreenBottomRightLocY =  worldScreenBottomRightLocY - worldHeadLocY;
 	float virtualScreenBottomRightLocZ =  worldScreenBottomRightLocZ - worldHeadLocZ;
 
-	float worldFarPlane = 2000.0; //in cm
-	float virtualNearPlane = 5.0;
-	float virtualFarPlane = worldFarPlane - worldHeadLocZ;
+	virtualFarPlane = worldFarPlane - worldHeadLocZ;
 
-	float virtualNearTopLeftLocX = virtualNearPlane/virtualScreenTopLeftLocZ*virtualScreenTopLeftLocX;
-	float virtualNearTopLeftLocY = virtualNearPlane/virtualScreenTopLeftLocZ*virtualScreenTopLeftLocY;
+	virtualNearTopLeftLocX = virtualNearPlane/virtualScreenTopLeftLocZ*virtualScreenTopLeftLocX;
+	virtualNearTopLeftLocY = virtualNearPlane/virtualScreenTopLeftLocZ*virtualScreenTopLeftLocY;
 	float virtualNearTopLeftLocZ = virtualNearPlane/virtualScreenTopLeftLocZ*virtualScreenTopLeftLocZ;
 
-	float virtualNearBottomRightLocX = virtualScreenBottomRightLocX / virtualScreenBottomRightLocZ * virtualNearPlane;
-	float virtualNearBottomRightLocY = virtualScreenBottomRightLocY / virtualScreenBottomRightLocZ * virtualNearPlane;
+	virtualNearBottomRightLocX = virtualScreenBottomRightLocX / virtualScreenBottomRightLocZ * virtualNearPlane;
+	virtualNearBottomRightLocY = virtualScreenBottomRightLocY / virtualScreenBottomRightLocZ * virtualNearPlane;
 	float virtualNearBottomRightLocZ = virtualScreenBottomRightLocZ / virtualScreenBottomRightLocZ * virtualNearPlane;
+	
 	
 
 	glFrustum(virtualNearTopLeftLocX, virtualNearBottomRightLocX, -virtualNearBottomRightLocY, -virtualNearTopLeftLocY, virtualNearPlane, virtualFarPlane);
 }
 
-bool initKinect() {
+void testDoCameraUpdate()
+{
+	//Center of screen 0,0,0 this should translate to the center of slipping volume being at 0,0,0
+	//Top of screen in reality (-height/2)
+	//Bottom of screen in reality (height/2)
+	//Left of screen in reality (-width/2)
+	//Right of screen in reality (width/2)
+	//Z Loc of screen in reality (0?)
+
+	//Need to get coord systems matching for the kinect and OpenGL, a simple rotate(90, 1,0,0) should be it
+	//Point X of head in reality
+	//Point Y of head in reality
+	//Point Z of head in reality
+
+	//Near clipping field I think might need to be distance from you to screen (headPosZ - |screenLocationRealityZ| + kinectToScreenDist) (Unless objects in front of screen can happen: 
+		//then it would require a lot of calulations to fake the near plane to still be at 0,0,0 but when the near plane is somewhere in fron of screen (likely multiplying everything by some scale based on how far in front of the screen that is, not sure though
+	//Far clipping feild would be any point out to infinity
+
+	//convert those real world coord into virtual world coords
+	//Use ratio of w and h from viewport for this I think
+
+
+}
+*/
+//Clean up kinect code some uneeded stuff in here
+bool initKinect() 
+{
     // Get a working kinect sensor
     int numSensors;
     if (NuiGetSensorCount(&numSensors) < 0 || numSensors < 1) return false;
@@ -166,19 +199,25 @@ bool initKinect() {
     return sensor;
 }
 
-void getSkeletalData() {
+void getSkeletalData() 
+{
 	NUI_SKELETON_FRAME skeletonFrame = {0};
-    if (sensor->NuiSkeletonGetNextFrame(0, &skeletonFrame) >= 0) {
+    if (sensor->NuiSkeletonGetNextFrame(0, &skeletonFrame) >= 0) 
+	{
 		sensor->NuiTransformSmooth(&skeletonFrame, NULL);
 		// Loop over all sensed skeletons
-		for (int z = 0; z < NUI_SKELETON_COUNT; ++z) {
+		for (int z = 0; z < NUI_SKELETON_COUNT; ++z) 
+		{
 			const NUI_SKELETON_DATA& skeleton = skeletonFrame.SkeletonData[z];
 			// Check the state of the skeleton
-			if (skeleton.eTrackingState == NUI_SKELETON_TRACKED) {			
+			if (skeleton.eTrackingState == NUI_SKELETON_TRACKED) 
+			{			
 				// Copy the joint positions into our array
-				for (int i = 0; i < NUI_SKELETON_POSITION_COUNT; ++i) {
+				for (int i = 0; i < NUI_SKELETON_POSITION_COUNT; ++i) 
+				{
 					skeletonPosition[i] = skeleton.SkeletonPositions[i];
-					if (skeleton.eSkeletonPositionTrackingState[i] == NUI_SKELETON_POSITION_NOT_TRACKED) {
+					if (skeleton.eSkeletonPositionTrackingState[i] == NUI_SKELETON_POSITION_NOT_TRACKED) 
+					{
 						skeletonPosition[i].w = 0;
 					}
 				}
@@ -295,7 +334,7 @@ void spheres()
 	glMaterialfv(GL_FRONT_AND_BACK, GL_DIFFUSE, blue);
 	glPushMatrix();
 		glColor3f(0.0, 0.0, 1.0); //blue
-		glTranslatef (4.0, 0.0, 0.0);
+		glTranslatef (0.0, 0.0, 10.0);
 		glutSolidSphere(1, 100, 100);
 	glPopMatrix();
 
@@ -303,7 +342,7 @@ void spheres()
 	glMaterialfv(GL_FRONT_AND_BACK, GL_DIFFUSE, orange);
 	glPushMatrix();
 		glColor3f(1.0, 0.5, 0.0); //orange
-		glTranslatef (-4.0, 0.0, 0.0);
+		glTranslatef (.0, 0.0, -10.0);
 		glutSolidSphere(1, 100, 100);
 	glPopMatrix();
 
@@ -311,7 +350,7 @@ void spheres()
 	glMaterialfv(GL_FRONT_AND_BACK, GL_DIFFUSE, purple);
 	glPushMatrix();
 		glColor3f(0.5, 0.0, 0.5); //purple
-		glTranslatef (0.0, 0.0, 5.0);
+		glTranslatef (10.0, 0.0, 0.0);
 		glutSolidSphere(1, 100, 100);
 	glPopMatrix();
 	
@@ -319,7 +358,7 @@ void spheres()
 	glMaterialfv(GL_FRONT_AND_BACK, GL_DIFFUSE, black);
 	glPushMatrix();
 		glColor3f(0.0, 0.0, 0.0); //black
-		glTranslatef (0.0, 0.0, -5.0); 
+		glTranslatef (-10.0, 0.0, 0.0); 
 		glutSolidSphere(1, 100, 100);
 	glPopMatrix();   
 
@@ -327,7 +366,7 @@ void spheres()
 	glMaterialfv(GL_FRONT_AND_BACK, GL_DIFFUSE, red);
 	glPushMatrix();
 		glColor3f(1.0, 0.0, 0.0); //red
-		glTranslatef (20.0, 0.0, 0.0); 
+		glTranslatef (0.0, 0.0, 18.0); 
 		glutSolidSphere(1, 100, 100);
 	glPopMatrix();   
 
@@ -365,10 +404,42 @@ void scene()
 	glBegin(GL_QUADS);
 		glColor3f(1.0,0.0,0.0);
 		glNormal3d(0, 0, 1);
-		glTexCoord2f(-5.0,-5.0);	glVertex3f(-50.0,-1.0,-20.0);
-		glTexCoord2f(-5.0,5.0);		glVertex3f( 50.0,-1.0,-20.0); 
-		glTexCoord2f(5.0,5.0);		glVertex3f( 50.0,-1.0, 20.0);  
-		glTexCoord2f(5.0,-5.0);		glVertex3f(-50.0,-1.0, 20.0);
+		glTexCoord2f(-5.0,-5.0);	glVertex3f(-screenWidthCm,-screenHeightCm,-50.0);
+		glTexCoord2f(-5.0,5.0);		glVertex3f( screenWidthCm,-screenHeightCm,-50.0); 
+		glTexCoord2f(5.0,5.0);		glVertex3f( screenWidthCm,-screenHeightCm, 50.0);  
+		glTexCoord2f(5.0,-5.0);		glVertex3f(-screenWidthCm,-screenHeightCm, 50.0);
+    glEnd();
+	glBegin(GL_QUADS);
+		glColor3f(1.0,0.0,0.0);
+		glNormal3d(0, 0, 1);
+		glTexCoord2f(-5.0,-5.0);	glVertex3f(-screenWidthCm,-screenHeightCm,-50.0);
+		glTexCoord2f(-5.0,5.0);		glVertex3f(-screenWidthCm, screenHeightCm,-50.0); 
+		glTexCoord2f(5.0,5.0);		glVertex3f(-screenWidthCm, screenHeightCm, 50.0);  
+		glTexCoord2f(5.0,-5.0);		glVertex3f(-screenWidthCm,-screenHeightCm, 50.0);
+    glEnd();
+	glBegin(GL_QUADS);
+		glColor3f(1.0,0.0,0.0);
+		glNormal3d(0, 0, 1);
+		glTexCoord2f(-5.0,-5.0);	glVertex3f(screenWidthCm,-screenHeightCm,-50.0);
+		glTexCoord2f(-5.0,5.0);		glVertex3f(screenWidthCm, screenHeightCm,-50.0); 
+		glTexCoord2f(5.0,5.0);		glVertex3f(screenWidthCm, screenHeightCm, 50.0);  
+		glTexCoord2f(5.0,-5.0);		glVertex3f(screenWidthCm,-screenHeightCm, 50.0);
+    glEnd();
+	glBegin(GL_QUADS);
+		glColor3f(1.0,0.0,0.0);
+		glNormal3d(0, 0, 1);
+		glTexCoord2f(-5.0,-5.0);	glVertex3f(-screenWidthCm,screenHeightCm,-50.0);
+		glTexCoord2f(-5.0,5.0);		glVertex3f( screenWidthCm,screenHeightCm,-50.0); 
+		glTexCoord2f(5.0,5.0);		glVertex3f( screenWidthCm,screenHeightCm, 50.0);  
+		glTexCoord2f(5.0,-5.0);		glVertex3f(-screenWidthCm,screenHeightCm, 50.0);
+    glEnd();
+	glBegin(GL_QUADS);
+		glColor3f(1.0,0.0,0.0);
+		glNormal3d(0, 0, 1);
+		glTexCoord2f(-5.0,-5.0);	glVertex3f(-screenWidthCm,-screenHeightCm,-50.0);
+		glTexCoord2f(-5.0,5.0);		glVertex3f( screenWidthCm,-screenHeightCm,-50.0); 
+		glTexCoord2f(5.0,5.0);		glVertex3f( screenWidthCm, screenHeightCm,-50.0);  
+		glTexCoord2f(5.0,-5.0);		glVertex3f(-screenWidthCm, screenHeightCm,-50.0);
     glEnd();
 	/*
 	//Draw box out to infinity
@@ -392,27 +463,27 @@ void keyboard (unsigned char key, int x, int y) {
 		case  27:  
 			exit (0);
 		case 'w': 
-			yposOriginal += 1;
-			glutPostRedisplay();  
-			break;
-		case 's': 
-			yposOriginal -= 1;
-			glutPostRedisplay();  
-			break;
-		case 'a': 
 			zposOriginal += 1;
 			glutPostRedisplay();  
 			break;
-		case 'd': 
+		case 's': 
 			zposOriginal -= 1;
 			glutPostRedisplay();  
 			break;
-		case 'q': 
+		case 'a': 
 			xposOriginal += 1;
 			glutPostRedisplay();  
 			break;
-		case 'e': 
+		case 'd': 
 			xposOriginal -= 1;
+			glutPostRedisplay();  
+			break;
+		case 'q': 
+			yposOriginal += 1;
+			glutPostRedisplay();  
+			break;
+		case 'e': 
+			yposOriginal -= 1;
 			glutPostRedisplay();  
 			break;
 		case 'p':
@@ -435,21 +506,12 @@ void keyboard (unsigned char key, int x, int y) {
 		case 'i':
 			infoToggle = !infoToggle;
 			break;
-		case '8': 
-			posScale += .5;
-			glutPostRedisplay();  
-			break;
-		case '5': 
-			posScale -= .5;
-			glutPostRedisplay();  
-			break;
-
 		case 'W': 
-			zrotOriginal += 1;
+			xrotOriginal += 1;
 			glutPostRedisplay();  
 			break;
 		case 'S': 
-			zrotOriginal -= 1;
+			xrotOriginal -= 1;
 			glutPostRedisplay();  
 			break;
 		case 'A': 
@@ -461,13 +523,27 @@ void keyboard (unsigned char key, int x, int y) {
 			glutPostRedisplay();  
 			break;
 		case 'Q': 
-			scale -= 1;
+			scale -= .25;
 			glutPostRedisplay();  
 			break;
 		case 'E': 
-			scale += 1;
+			scale += .25;
 			glutPostRedisplay();  
 			break;
+		case '8': 
+			worldHeadLocZ += .5;
+			glutPostRedisplay();  
+			break;
+		case '4': 
+			glutPostRedisplay();  
+			break;
+		case '5': 
+			worldHeadLocZ -= .5;
+			glutPostRedisplay();  
+			break;
+		case '6': 
+			glutPostRedisplay();  
+			break; 
 		case ' ':
 			glutFullScreen();
 			break;
@@ -484,18 +560,21 @@ void updatePosition(int value)
 
 
 void display()
-{ 
+{
+	glMatrixMode(GL_PROJECTION);
+	glLoadIdentity();
+	glFrustum(-1.0*pixelRatio, 1.0*pixelRatio, -1.0, 1.0, 5.0 - worldHeadLocZ, 2000.0);
     glClear(GL_COLOR_BUFFER_BIT|GL_DEPTH_BUFFER_BIT);
     glMatrixMode(GL_MODELVIEW);
-    glLoadIdentity();
-	doCameraUpdate();
-    gluLookAt(10.0, 6.0, 0.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0);
+	glLoadIdentity();
+	//doCameraUpdate();
+    //gluLookAt(10.0, 6.0, 0.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0);
     
 
 	if(sensor)
 	{
 		//do head position update
-		getSkeletalData();//grab skeleton data
+		//getSkeletalData();//grab skeleton data
 
 		//Old code each track type seperated by new line, rot was the most tested		
 		//change based on pos
@@ -505,16 +584,16 @@ void display()
 
 		//change using rotates
 		//yrot = ((atan(skeletonPosition[NUI_SKELETON_POSITION_HEAD].x/(-skeletonPosition[NUI_SKELETON_POSITION_HEAD].z)) * 180) / PI) * rotScale;
-		//zrot = -((atan(-skeletonPosition[NUI_SKELETON_POSITION_HEAD].y/(-skeletonPosition[NUI_SKELETON_POSITION_HEAD].z)) * 180) / PI) * rotScale; //may not need later
+		//zrot = ((atan(-skeletonPosition[NUI_SKELETON_POSITION_HEAD].y/(-skeletonPosition[NUI_SKELETON_POSITION_HEAD].z)) * 180) / PI) * rotScale; //may not need later
 
 		//change using gluLookAt
 		//glRotatef(90, 0, 1, 0);
 		//gluLookAt(skeletonPosition[NUI_SKELETON_POSITION_HEAD].z, skeletonPosition[NUI_SKELETON_POSITION_HEAD].y, -skeletonPosition[NUI_SKELETON_POSITION_HEAD].x, 0.0, 0.0, 0.0, 0, 1, 0);
 
 		//get real world coords and store them appropriately 
-		worldHeadLocX = skeletonPosition[NUI_SKELETON_POSITION_HEAD].x * 10; //grab head positions and convert to cmgu
-		worldHeadLocY = skeletonPosition[NUI_SKELETON_POSITION_HEAD].y * 10 - 4;		
-		worldHeadLocZ = skeletonPosition[NUI_SKELETON_POSITION_HEAD].z * 10;
+		worldHeadLocX = skeletonPosition[NUI_SKELETON_POSITION_HEAD].x * 100; //grab head positions and convert to cmgu
+		worldHeadLocY = skeletonPosition[NUI_SKELETON_POSITION_HEAD].y * 100;		
+		worldHeadLocZ = skeletonPosition[NUI_SKELETON_POSITION_HEAD].z * 100;
 
 		if(infoToggle)
 		{
@@ -522,7 +601,6 @@ void display()
 	
 		}
 	}
-	
 	glTranslatef (xposOriginal, yposOriginal, zposOriginal);  // Translations.
 
 	glRotatef (zrotOriginal + zrot, 0,0,1);        // Rotations.
@@ -543,14 +621,14 @@ void reshape(int w, int h)
 {
 	pixelWidth = w;
 	pixelHeight = h;
-	pixelRatio = w/h;
+	pixelRatio = (float)w/h;
 	glViewport(0,0, w, h);
-	glMatrixMode(GL_PROJECTION);
-	glLoadIdentity();
+	//glMatrixMode(GL_PROJECTION);
+	//glLoadIdentity();
 	//glOrtho(-20.0, 20.0, -20.0, 20.0, -20.0, 230.0); //Old parallel projection
 	//gluPerspective(10, w/h, 10, 100);
-	//glFrustum(-1.0*w/h, 1.0*w/h, -1.0, 1.0, 5.0, 2000.0);
-	//glFrustum(nearPlane * (-fov * pixelRatio + 1), nearPlane * (fov * pixelRatio + 1), nearPlane * (-fov + .5), nearPlane * (fov + .5), nearPlane, farPlane);
+	//glFrustum(-1.0*w/h, 1.0*w/h, -1.0, 1.0, 5.0, 2000.0); //first frustrum
+	//doCameraUpdate();
 }
 
 
