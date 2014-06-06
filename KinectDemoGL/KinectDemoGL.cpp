@@ -23,8 +23,10 @@ using namespace std;
 
 const int TEXTURECOUNT = 1;
 const double PI = 3.14159265358979323846;
-const float screenWidthCm = 34.5;
-const float screenHeightCm = 19.5;
+const float screenWidthCm = 142.3;
+const float screenHeightCm = 80.5;
+const float kinectOffsetCm[3] = {0,-40,0};
+
 //Collab 4K tv 142.3 cm Width 80.5 Height
 //Collab Resolution 3840 x 2160
 
@@ -62,7 +64,7 @@ int textureWidth[TEXTURECOUNT];
 int textureHeight[TEXTURECOUNT];
 
 //Lighting Vars
-GLfloat lightPosition[]    = {20, 10, 4, 0.0};
+GLfloat lightPosition[]    = {screenWidthCm, screenHeightCm, 50, 0.0};
 
 GLfloat green[] = {0.0, 1.0, 0.0, 1.0}; //Green Color
 GLfloat blue[] = {0.0, 0.0, 1.0, 1.0}; //Blue Color
@@ -114,7 +116,7 @@ float virtualNearBottomRightLocY;
 float worldFarPlane = 2000.0; //in cm
 float virtualNearPlane = 5.0;
 float virtualFarPlane;
-/*
+
 void doCameraUpdate()
 {
 	
@@ -149,8 +151,18 @@ void doCameraUpdate()
 	glFrustum(virtualNearTopLeftLocX, virtualNearBottomRightLocX, -virtualNearBottomRightLocY, -virtualNearTopLeftLocY, virtualNearPlane, virtualFarPlane);
 }
 
-void testDoCameraUpdate()
+
+void doCameraUpdateTest()
 {
+	int x = 0;
+	int y = 1;
+	int z = 2;
+
+	int l = 0;
+	int r = 1;
+	int b = 2; 
+	int t = 3;
+	int n = 4;//Not sure how to get near
 	//Center of screen 0,0,0 this should translate to the center of slipping volume being at 0,0,0
 	//Top of screen in reality (-height/2)
 	//Bottom of screen in reality (height/2)
@@ -158,21 +170,32 @@ void testDoCameraUpdate()
 	//Right of screen in reality (width/2)
 	//Z Loc of screen in reality (0?)
 
-	//Need to get coord systems matching for the kinect and OpenGL, a simple rotate(90, 1,0,0) should be it
+	float frustumScreen[] = {-screenWidthCm/2, screenWidthCm/2, -screenHeightCm/2, screenHeightCm/2, 0}; //0 Could be changed maybe for points in front of screen but 0 for now
+
 	//Point X of head in reality
 	//Point Y of head in reality
 	//Point Z of head in reality
+	float headPoint[] = {skeletonPosition[NUI_SKELETON_POSITION_HEAD].x * 100 + kinectOffsetCm[x], skeletonPosition[NUI_SKELETON_POSITION_HEAD].y * 100 + kinectOffsetCm[y], skeletonPosition[NUI_SKELETON_POSITION_HEAD].z * 100 +  + kinectOffsetCm[z]};
+
 
 	//Near clipping field I think might need to be distance from you to screen (headPosZ - |screenLocationRealityZ| + kinectToScreenDist) (Unless objects in front of screen can happen: 
-		//then it would require a lot of calulations to fake the near plane to still be at 0,0,0 but when the near plane is somewhere in fron of screen (likely multiplying everything by some scale based on how far in front of the screen that is, not sure though
+		//then it would require a lot of calulations to fake the near plane center to still be at 0,0,0 but when the near plane is somewhere in front of screen (likely multiplying everything by some scale based on how far in front of the screen that is, not sure though
 	//Far clipping feild would be any point out to infinity
 
+	float left = frustumScreen[l] - headPoint[x];
+	float right = frustumScreen[r] - headPoint[x];
+	float bottom = frustumScreen[b] - headPoint[y];
+	float top = frustumScreen[t] - headPoint[y];
+
+	glFrustum(left*pixelRatio, right*pixelRatio, bottom, top, 5.0, 200.0);
+
 	//convert those real world coord into virtual world coords
+	//Right now for testing 1 unit in wcs = 1cm
 	//Use ratio of w and h from viewport for this I think
 
 
 }
-*/
+
 //Clean up kinect code some uneeded stuff in here
 bool initKinect() 
 {
@@ -327,47 +350,47 @@ void spheres()
 	glPushMatrix();
 		glColor3f(0.0, 1.0, 0.0); //wanted center of projection green sphere
 		glTranslatef (0.0, 0.0, 0.0);
-		glutSolidSphere(1, 100, 100);
+		glutSolidSphere(1*screenHeightCm/8, 100, 100);
 	glPopMatrix();
 
 	glMaterialfv(GL_FRONT_AND_BACK, GL_AMBIENT, blue);
 	glMaterialfv(GL_FRONT_AND_BACK, GL_DIFFUSE, blue);
 	glPushMatrix();
 		glColor3f(0.0, 0.0, 1.0); //blue
-		glTranslatef (0.0, 0.0, 10.0);
-		glutSolidSphere(1, 100, 100);
+		glTranslatef (0.0, 0.0, 10.0*screenHeightCm/8);
+		glutSolidSphere(1*screenHeightCm/8, 100, 100);
 	glPopMatrix();
 
 	glMaterialfv(GL_FRONT_AND_BACK, GL_AMBIENT, orange);
 	glMaterialfv(GL_FRONT_AND_BACK, GL_DIFFUSE, orange);
 	glPushMatrix();
 		glColor3f(1.0, 0.5, 0.0); //orange
-		glTranslatef (.0, 0.0, -10.0);
-		glutSolidSphere(1, 100, 100);
+		glTranslatef (.0, 0.0, -10.0*screenHeightCm/8);
+		glutSolidSphere(1*screenHeightCm/8, 100, 100);
 	glPopMatrix();
 
 	glMaterialfv(GL_FRONT_AND_BACK, GL_AMBIENT, purple);
 	glMaterialfv(GL_FRONT_AND_BACK, GL_DIFFUSE, purple);
 	glPushMatrix();
 		glColor3f(0.5, 0.0, 0.5); //purple
-		glTranslatef (10.0, 0.0, 0.0);
-		glutSolidSphere(1, 100, 100);
+		glTranslatef (10.0*screenHeightCm/8, 0.0, 0.0);
+		glutSolidSphere(1*screenHeightCm/8, 100, 100);
 	glPopMatrix();
 	
 	glMaterialfv(GL_FRONT_AND_BACK, GL_AMBIENT, black);
 	glMaterialfv(GL_FRONT_AND_BACK, GL_DIFFUSE, black);
 	glPushMatrix();
 		glColor3f(0.0, 0.0, 0.0); //black
-		glTranslatef (-10.0, 0.0, 0.0); 
-		glutSolidSphere(1, 100, 100);
+		glTranslatef (-10.0*screenHeightCm/8, 0.0, 0.0); 
+		glutSolidSphere(1*screenHeightCm/8, 100, 100);
 	glPopMatrix();   
 
 	glMaterialfv(GL_FRONT_AND_BACK, GL_AMBIENT, red);
 	glMaterialfv(GL_FRONT_AND_BACK, GL_DIFFUSE, red);
 	glPushMatrix();
 		glColor3f(1.0, 0.0, 0.0); //red
-		glTranslatef (0.0, 0.0, 18.0); 
-		glutSolidSphere(1, 100, 100);
+		glTranslatef (0.0, 0.0, 18.0*screenHeightCm/8); 
+		glutSolidSphere(1*screenHeightCm/8, 100, 100);
 	glPopMatrix();   
 
     glDisable(GL_LIGHTING);
@@ -401,45 +424,45 @@ void scene()
     glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
     glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
 
-	glBegin(GL_QUADS);
+	glBegin(GL_QUADS); //bottom
 		glColor3f(1.0,0.0,0.0);
-		glNormal3d(0, 0, 1);
-		glTexCoord2f(-5.0,-5.0);	glVertex3f(-screenWidthCm,-screenHeightCm,-50.0);
-		glTexCoord2f(-5.0,5.0);		glVertex3f( screenWidthCm,-screenHeightCm,-50.0); 
-		glTexCoord2f(5.0,5.0);		glVertex3f( screenWidthCm,-screenHeightCm, 50.0);  
-		glTexCoord2f(5.0,-5.0);		glVertex3f(-screenWidthCm,-screenHeightCm, 50.0);
+		glNormal3d(0, 1, 0); 
+		glTexCoord2f(5.0,5.0);		glVertex3f( screenWidthCm,-screenHeightCm, 4.0*screenHeightCm);  
+		glTexCoord2f(-5.0,5.0);		glVertex3f( screenWidthCm,-screenHeightCm,-4.0*screenHeightCm);
+		glTexCoord2f(-5.0,-5.0);	glVertex3f(-screenWidthCm,-screenHeightCm,-4.0*screenHeightCm);
+		glTexCoord2f(5.0,-5.0);		glVertex3f(-screenWidthCm,-screenHeightCm, 4.0*screenHeightCm);
+    glEnd();
+	glBegin(GL_QUADS);//Left
+		glColor3f(1.0,0.0,0.0);
+		glNormal3d(1, 0, 0);
+		glTexCoord2f(-5.0,-5.0);	glVertex3f(-screenWidthCm,-screenHeightCm,-4.0*screenHeightCm);
+		glTexCoord2f(-5.0,5.0);		glVertex3f(-screenWidthCm, screenHeightCm,-4.0*screenHeightCm); 
+		glTexCoord2f(5.0,5.0);		glVertex3f(-screenWidthCm, screenHeightCm, 4.0*screenHeightCm);  
+		glTexCoord2f(5.0,-5.0);		glVertex3f(-screenWidthCm,-screenHeightCm, 4.0*screenHeightCm);
+    glEnd();
+	glBegin(GL_QUADS);//Right
+		glColor3f(1.0,0.0,0.0);
+		glNormal3d(-1, 0, 0); 
+		glTexCoord2f(5.0,-5.0);		glVertex3f(screenWidthCm,-screenHeightCm, 4.0*screenHeightCm);
+		glTexCoord2f(5.0,5.0);		glVertex3f(screenWidthCm, screenHeightCm, 4.0*screenHeightCm);
+		glTexCoord2f(-5.0,5.0);		glVertex3f(screenWidthCm, screenHeightCm,-4.0*screenHeightCm);
+		glTexCoord2f(-5.0,-5.0);	glVertex3f(screenWidthCm,-screenHeightCm,-4.0*screenHeightCm);
+    glEnd();
+	glBegin(GL_QUADS);//Top
+		glColor3f(1.0,0.0,0.0);
+		glNormal3d(0, -1, 0);
+		glTexCoord2f(-5.0,5.0);		glVertex3f( screenWidthCm,screenHeightCm,-4.0*screenHeightCm); 
+		glTexCoord2f(5.0,5.0);		glVertex3f( screenWidthCm,screenHeightCm, 4.0*screenHeightCm);  
+		glTexCoord2f(5.0,-5.0);		glVertex3f(-screenWidthCm,screenHeightCm, 4.0*screenHeightCm);
+		glTexCoord2f(-5.0,-5.0);	glVertex3f(-screenWidthCm,screenHeightCm,-4.0*screenHeightCm);
     glEnd();
 	glBegin(GL_QUADS);
 		glColor3f(1.0,0.0,0.0);
 		glNormal3d(0, 0, 1);
-		glTexCoord2f(-5.0,-5.0);	glVertex3f(-screenWidthCm,-screenHeightCm,-50.0);
-		glTexCoord2f(-5.0,5.0);		glVertex3f(-screenWidthCm, screenHeightCm,-50.0); 
-		glTexCoord2f(5.0,5.0);		glVertex3f(-screenWidthCm, screenHeightCm, 50.0);  
-		glTexCoord2f(5.0,-5.0);		glVertex3f(-screenWidthCm,-screenHeightCm, 50.0);
-    glEnd();
-	glBegin(GL_QUADS);
-		glColor3f(1.0,0.0,0.0);
-		glNormal3d(0, 0, 1);
-		glTexCoord2f(-5.0,-5.0);	glVertex3f(screenWidthCm,-screenHeightCm,-50.0);
-		glTexCoord2f(-5.0,5.0);		glVertex3f(screenWidthCm, screenHeightCm,-50.0); 
-		glTexCoord2f(5.0,5.0);		glVertex3f(screenWidthCm, screenHeightCm, 50.0);  
-		glTexCoord2f(5.0,-5.0);		glVertex3f(screenWidthCm,-screenHeightCm, 50.0);
-    glEnd();
-	glBegin(GL_QUADS);
-		glColor3f(1.0,0.0,0.0);
-		glNormal3d(0, 0, 1);
-		glTexCoord2f(-5.0,-5.0);	glVertex3f(-screenWidthCm,screenHeightCm,-50.0);
-		glTexCoord2f(-5.0,5.0);		glVertex3f( screenWidthCm,screenHeightCm,-50.0); 
-		glTexCoord2f(5.0,5.0);		glVertex3f( screenWidthCm,screenHeightCm, 50.0);  
-		glTexCoord2f(5.0,-5.0);		glVertex3f(-screenWidthCm,screenHeightCm, 50.0);
-    glEnd();
-	glBegin(GL_QUADS);
-		glColor3f(1.0,0.0,0.0);
-		glNormal3d(0, 0, 1);
-		glTexCoord2f(-5.0,-5.0);	glVertex3f(-screenWidthCm,-screenHeightCm,-50.0);
-		glTexCoord2f(-5.0,5.0);		glVertex3f( screenWidthCm,-screenHeightCm,-50.0); 
-		glTexCoord2f(5.0,5.0);		glVertex3f( screenWidthCm, screenHeightCm,-50.0);  
-		glTexCoord2f(5.0,-5.0);		glVertex3f(-screenWidthCm, screenHeightCm,-50.0);
+		glTexCoord2f(-5.0,5.0);		glVertex3f( screenWidthCm,-screenHeightCm,-4.0*screenHeightCm); 
+		glTexCoord2f(5.0,5.0);		glVertex3f( screenWidthCm, screenHeightCm,-4.0*screenHeightCm);  
+		glTexCoord2f(5.0,-5.0);		glVertex3f(-screenWidthCm, screenHeightCm,-4.0*screenHeightCm);
+		glTexCoord2f(-5.0,-5.0);	glVertex3f(-screenWidthCm,-screenHeightCm,-4.0*screenHeightCm);
     glEnd();
 	/*
 	//Draw box out to infinity
@@ -530,20 +553,30 @@ void keyboard (unsigned char key, int x, int y) {
 			scale += .25;
 			glutPostRedisplay();  
 			break;
-		case '8': 
-			worldHeadLocZ += .5;
-			glutPostRedisplay();  
+		case '7': 
+			worldHeadLocZ += .25;
+			glutPostRedisplay(); 
 			break;
-		case '4': 
-			glutPostRedisplay();  
+		case '9': 
+			worldHeadLocZ -= .25;
+			glutPostRedisplay();
+			break;
+		case '8': 
+			worldHeadLocX += .25;
+			glutPostRedisplay();
 			break;
 		case '5': 
-			worldHeadLocZ -= .5;
-			glutPostRedisplay();  
+			worldHeadLocX -= .25;
+			glutPostRedisplay();
+			break;
+		case '4': 
+			worldHeadLocY -= .25;
+			glutPostRedisplay();
 			break;
 		case '6': 
-			glutPostRedisplay();  
-			break; 
+			worldHeadLocY += .25;
+			glutPostRedisplay();
+			break;
 		case ' ':
 			glutFullScreen();
 			break;
@@ -561,39 +594,39 @@ void updatePosition(int value)
 
 void display()
 {
-	glMatrixMode(GL_PROJECTION);
-	glLoadIdentity();
-	glFrustum(-1.0*pixelRatio, 1.0*pixelRatio, -1.0, 1.0, 5.0 - worldHeadLocZ, 2000.0);
     glClear(GL_COLOR_BUFFER_BIT|GL_DEPTH_BUFFER_BIT);
     glMatrixMode(GL_MODELVIEW);
 	glLoadIdentity();
-	//doCameraUpdate();
     //gluLookAt(10.0, 6.0, 0.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0);
     
 
 	if(sensor)
 	{
 		//do head position update
-		//getSkeletalData();//grab skeleton data
+		getSkeletalData();//grab skeleton data
+
+		//get real world coords and store them appropriately 
+		worldHeadLocX = skeletonPosition[NUI_SKELETON_POSITION_HEAD].x * 1; //grab head positions and convert to cm do kinect offset to screen here
+		worldHeadLocY = skeletonPosition[NUI_SKELETON_POSITION_HEAD].y * 1 - .4;		
+		worldHeadLocZ = skeletonPosition[NUI_SKELETON_POSITION_HEAD].z * 1;
 
 		//Old code each track type seperated by new line, rot was the most tested		
 		//change based on pos
-		//zpos =  skeletonPosition[NUI_SKELETON_POSITION_HEAD].x * posScale + zposOriginal;
-		//ypos = -skeletonPosition[NUI_SKELETON_POSITION_HEAD].y * posScale + yposOriginal; //may not need later
-		//xpos = -skeletonPosition[NUI_SKELETON_POSITION_HEAD].z * posScale + xposOriginal; //may not need later
+		xpos = worldHeadLocX * -10; 
+		ypos = worldHeadLocY * -10; //may not need later
+		zpos = worldHeadLocZ * -10; //may not need later
+
 
 		//change using rotates
-		//yrot = ((atan(skeletonPosition[NUI_SKELETON_POSITION_HEAD].x/(-skeletonPosition[NUI_SKELETON_POSITION_HEAD].z)) * 180) / PI) * rotScale;
-		//zrot = ((atan(-skeletonPosition[NUI_SKELETON_POSITION_HEAD].y/(-skeletonPosition[NUI_SKELETON_POSITION_HEAD].z)) * 180) / PI) * rotScale; //may not need later
+		//xrot = ((atan(-skeletonPosition[NUI_SKELETON_POSITION_HEAD].z/(-skeletonPosition[NUI_SKELETON_POSITION_HEAD].y)) * 360) / PI) * rotScale;
+		//yrot = -((atan(skeletonPosition[NUI_SKELETON_POSITION_HEAD].z/(-skeletonPosition[NUI_SKELETON_POSITION_HEAD].x)) * 360) / PI) * rotScale;
+
 
 		//change using gluLookAt
 		//glRotatef(90, 0, 1, 0);
-		//gluLookAt(skeletonPosition[NUI_SKELETON_POSITION_HEAD].z, skeletonPosition[NUI_SKELETON_POSITION_HEAD].y, -skeletonPosition[NUI_SKELETON_POSITION_HEAD].x, 0.0, 0.0, 0.0, 0, 1, 0);
+		//gluLookAt(skeletonPosition[NUI_SKELETON_POSITION_HEAD].x, skeletonPosition[NUI_SKELETON_POSITION_HEAD].y, -skeletonPosition[NUI_SKELETON_POSITION_HEAD].z, 0.0, 0.0, 0.0, 0, 1, 0);
 
-		//get real world coords and store them appropriately 
-		worldHeadLocX = skeletonPosition[NUI_SKELETON_POSITION_HEAD].x * 100; //grab head positions and convert to cmgu
-		worldHeadLocY = skeletonPosition[NUI_SKELETON_POSITION_HEAD].y * 100;		
-		worldHeadLocZ = skeletonPosition[NUI_SKELETON_POSITION_HEAD].z * 100;
+
 
 		if(infoToggle)
 		{
@@ -601,16 +634,22 @@ void display()
 	
 		}
 	}
-	glTranslatef (xposOriginal, yposOriginal, zposOriginal);  // Translations.
+	glTranslatef (xposOriginal + xpos, yposOriginal + ypos, zposOriginal + zpos);  // Translations.
 
 	glRotatef (zrotOriginal + zrot, 0,0,1);        // Rotations.
 	glRotatef (yrotOriginal + yrot, 0,1,0);
-	glRotatef (xrotOriginal, 1,0,0);
+	glRotatef (xrotOriginal + xrot, 1,0,0);
 
 
     glScalef (scale, scale, scale);
     spheres();
 	scene();	
+	glMatrixMode(GL_PROJECTION);
+	glLoadIdentity();
+	glFrustum((-1.0*pixelRatio - worldHeadLocX), (1.0*pixelRatio - worldHeadLocX), (-1.0 - worldHeadLocY), (1.0 - worldHeadLocY), 1.0 + worldHeadLocZ, 2000.0);
+	//gluLookAt(worldHeadLocX, worldHeadLocY, worldHeadLocZ, 0, 0, 0, 0, 1, 0);
+	//doCameraUpdate();
+	//doCameraUpdateTest();
 	//light position needs to rotate
 	glutSwapBuffers();
     
