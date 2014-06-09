@@ -606,15 +606,10 @@ void display()
 		getSkeletalData();//grab skeleton data
 
 		//get real world coords and store them appropriately 
-		worldHeadLocX = skeletonPosition[NUI_SKELETON_POSITION_HEAD].x * 1; //grab head positions and convert to cm do kinect offset to screen here
-		worldHeadLocY = skeletonPosition[NUI_SKELETON_POSITION_HEAD].y * 1 - .4;		
-		worldHeadLocZ = skeletonPosition[NUI_SKELETON_POSITION_HEAD].z * 1;
+		worldHeadLocX = skeletonPosition[NUI_SKELETON_POSITION_HEAD].x * 100; //grab head positions and convert to cm do kinect offset to screen here
+		worldHeadLocY = skeletonPosition[NUI_SKELETON_POSITION_HEAD].y * 100;		
+		worldHeadLocZ = skeletonPosition[NUI_SKELETON_POSITION_HEAD].z * 100;
 
-		//Old code each track type seperated by new line, rot was the most tested		
-		//change based on pos
-		xpos = worldHeadLocX * -10; 
-		ypos = worldHeadLocY * -10; //may not need later
-		zpos = worldHeadLocZ * -10; //may not need later
 
 
 		//change using rotates
@@ -634,7 +629,9 @@ void display()
 	
 		}
 	}
-	glTranslatef (xposOriginal + xpos, yposOriginal + ypos, zposOriginal + zpos);  // Translations.
+		//Old code each track type seperated by new line, rot was the most tested		
+		//change based on pos
+	//glTranslatef (xposOriginal -worldHeadLocX, yposOriginal -worldHeadLocY, zposOriginal -worldHeadLocZ);  // Translations.
 
 	glRotatef (zrotOriginal + zrot, 0,0,1);        // Rotations.
 	glRotatef (yrotOriginal + yrot, 0,1,0);
@@ -646,8 +643,9 @@ void display()
 	scene();	
 	glMatrixMode(GL_PROJECTION);
 	glLoadIdentity();
-	glFrustum((-1.0*pixelRatio - worldHeadLocX), (1.0*pixelRatio - worldHeadLocX), (-1.0 - worldHeadLocY), (1.0 - worldHeadLocY), 1.0 + worldHeadLocZ, 2000.0);
-	//gluLookAt(worldHeadLocX, worldHeadLocY, worldHeadLocZ, 0, 0, 0, 0, 1, 0);
+	glFrustum((-1.0*pixelRatio - worldHeadLocX/100), (1.0*pixelRatio - worldHeadLocX/100), (-1.0 - worldHeadLocY/100), (1.0 - worldHeadLocY/100), 1.0 + worldHeadLocZ/100, 2000.0);
+	//glFrustum((-1.0*pixelRatio - 0), (1.0*pixelRatio - 0), (-1.0 - 0), (1.0 - 0), 1.0 + 0, 2000.0);
+	gluLookAt(xposOriginal + worldHeadLocX, yposOriginal + worldHeadLocY, zposOriginal + worldHeadLocZ, 0, 0, 0, 0, 1, 0);
 	//doCameraUpdate();
 	//doCameraUpdateTest();
 	//light position needs to rotate
