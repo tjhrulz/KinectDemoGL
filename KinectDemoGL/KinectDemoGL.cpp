@@ -30,7 +30,6 @@ const float kinectOffsetCm[3] = {0,-46,0};
 const int X = 0;
 const int Y = 1;
 const int Z = 2;
-
 //Collab 4K tv 142.3 cm Width 80.5 Height
 //Collab Resolution 3840 x 2160
 
@@ -51,7 +50,6 @@ float zrot = 0.0;
 float worldHeadLoc[3];
 
 //Textures and Normals Vars
-GLUquadric* qobj;
 GLuint* image[TEXTURECOUNT];
 GLuint texture[TEXTURECOUNT];
 int textureWidth[TEXTURECOUNT];
@@ -79,7 +77,6 @@ GLfloat specularLight[]    = {1.0, 1.0, 1.0, 1.0};
 HANDLE depthStream;
 INuiSensor* sensor;
 Vector4 skeletonPosition[NUI_SKELETON_POSITION_COUNT];
-
 //Generic Vars
 bool infoToggle = false;
 
@@ -104,7 +101,7 @@ bool initKinect()
     // Initialize sensor
     sensor->NuiInitialize(NUI_INITIALIZE_FLAG_USES_SKELETON);
     sensor->NuiImageStreamOpen(NUI_IMAGE_TYPE_DEPTH_AND_PLAYER_INDEX, // Depth camera
-        NUI_IMAGE_RESOLUTION_640x480,                // Image resolution
+        NUI_IMAGE_RESOLUTION_80x60,                // Image resolution
         0,        // Image stream flags, e.g. near mode
         0,        // Number of frames to buffer
         NULL,     // Event handle
@@ -117,7 +114,7 @@ void getSkeletalData()
 {
 	NUI_SKELETON_FRAME skeletonFrame = {0};
     if (sensor->NuiSkeletonGetNextFrame(0, &skeletonFrame) >= 0) 
-	{
+	{	
 		sensor->NuiTransformSmooth(&skeletonFrame, NULL);
 		// Loop over all sensed skeletons
 		for (int z = 0; z < NUI_SKELETON_COUNT; ++z) 
@@ -126,20 +123,23 @@ void getSkeletalData()
 			// Check the state of the skeleton
 			if (skeleton.eTrackingState == NUI_SKELETON_TRACKED) 
 			{			
-				// Copy the joint positions into our array
-				for (int i = 0; i < NUI_SKELETON_POSITION_COUNT; ++i) 
+				
+				skeletonPosition[NUI_SKELETON_POSITION_HEAD] = skeleton.SkeletonPositions[NUI_SKELETON_POSITION_HEAD];
+				if (skeleton.eSkeletonPositionTrackingState[NUI_SKELETON_POSITION_HEAD] == NUI_SKELETON_POSITION_NOT_TRACKED) 
 				{
-					skeletonPosition[i] = skeleton.SkeletonPositions[i];
-					if (skeleton.eSkeletonPositionTrackingState[i] == NUI_SKELETON_POSITION_NOT_TRACKED) 
-					{
-						skeletonPosition[i].w = 0;
-					}
+					skeletonPosition[NUI_SKELETON_POSITION_HEAD].w = 0;
 				}
+				glutPostRedisplay();
 				return; // Only take the data for one skeleton
 			}
 		}
 	}
 }
+/*
+HANDLE doSceneUpdate()
+{
+	glutPostRedisplay();
+}*/
 
 void initTextures(char FileName[256])
 {
@@ -355,19 +355,6 @@ void scene()
 		glTexCoord2f(5.0,-5.0);		glVertex3f(-screenWidthCm, screenHeightCm,-4.0*screenHeightCm);
 		glTexCoord2f(-5.0,-5.0);	glVertex3f(-screenWidthCm,-screenHeightCm,-4.0*screenHeightCm);
     glEnd();
-	/*
-	//Draw box out to infinity
-	glDisable(GL_DEPTH_TEST);
-	glDepthMask(false);
-	glPushMatrix();
-
-
-
-	
-	glPopMatrix();
-	glDepthMask(true);
-	glEnable(GL_DEPTH_TEST);
-	*/
 	glDisable(GL_TEXTURE_2D);
 }
 
@@ -518,9 +505,8 @@ void display()
 
 	glMatrixMode(GL_PROJECTION);
 	glLoadIdentity();
-	glFrustum((-pixelRatio - worldHeadLoc[X]/100), (pixelRatio - worldHeadLoc[X]/100), (-1.0 - worldHeadLoc[Y]/100), (1.0 - worldHeadLoc[Y]/100), 1.0 + worldHeadLoc[Z]/100, 2000.0);
-	//glFrustum((-1.0*pixelRatio - 0), (1.0*pixelRatio - 0), (-1.0 - 0), (1.0 - 0), 1.0 + 0, 2000.0);
-	gluLookAt(xpos + worldHeadLoc[X], ypos + worldHeadLoc[Y], zpos + worldHeadLoc[Z], 0, 0, 0, 0, 1, 0);
+	glFrustum((-1 * pixelRatio - worldHeadLoc[X]/100), (1 * pixelRatio - worldHeadLoc[X]/100), (-1.0 - worldHeadLoc[Y]/100), (1.0 - worldHeadLoc[Y]/100), 5.0 + worldHeadLoc[Z]/100, 2000.0);
+	gluLookAt(xpos + worldHeadLoc[X]/4, ypos + worldHeadLoc[Y]/4, zpos + worldHeadLoc[Z]/4, 0, 0, 0, 0, 1, 0);
 
 	glutSwapBuffers();
     
@@ -533,11 +519,6 @@ void reshape(int w, int h)
 	pixelHeight = h;
 	pixelRatio = (float)w/h;
 	glViewport(0,0, w, h);
-	//glMatrixMode(GL_PROJECTION);
-	//glLoadIdentity();
-	//glOrtho(-20.0, 20.0, -20.0, 20.0, -20.0, 230.0); //Old parallel projection
-	//glFrustum(-1.0*w/h, 1.0*w/h, -1.0, 1.0, 5.0, 2000.0); //first frustrum
-	//doCameraUpdate();
 }
 
 
@@ -546,9 +527,7 @@ void init()
 {
 	glEnable(GL_DEPTH_TEST);
 	glClearColor(1.0, 1.0, 1.0, 1.0);
-	glColor3f(0.0, 0.0, 0.0);      
-	qobj = gluNewQuadric();
-	gluQuadricNormals(qobj, GLU_SMOOTH);
+	glColor3f(0.0, 0.0, 0.0);
 }
 
 //get window size, position, and start the functions to draw it all 
@@ -564,8 +543,9 @@ int main(int argc, char** argv)
 	glutInitDisplayMode(GLUT_DOUBLE|GLUT_RGB|GLUT_DEPTH);
 	glutInitWindowSize(800, 450);
 	glutInitWindowPosition(0, 0);
-	glutCreateWindow("WarGames");
+	glutCreateWindow("Kinect Headtracking OpenGL");
 	glutDisplayFunc(display);
+	glutIdleFunc(getSkeletalData);
 	glutReshapeFunc(reshape);
 	glutKeyboardFunc(keyboard);
 	
@@ -575,7 +555,6 @@ int main(int argc, char** argv)
 
 	init();
 
-
-	updatePosition(1);
+	//updatePosition(1);
 	glutMainLoop();   
 }
