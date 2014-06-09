@@ -25,7 +25,11 @@ const int TEXTURECOUNT = 1;
 const double PI = 3.14159265358979323846;
 const float screenWidthCm = 142.3;
 const float screenHeightCm = 80.5;
-const float kinectOffsetCm[3] = {0,-40,0};
+const float kinectOffsetCm[3] = {0,-46,0};
+
+const int X = 0;
+const int Y = 1;
+const int Z = 2;
 
 //Collab 4K tv 142.3 cm Width 80.5 Height
 //Collab Resolution 3840 x 2160
@@ -36,25 +40,15 @@ const float kinectOffsetCm[3] = {0,-40,0};
 
 
 // Camera Postition Vars
-float xposOriginal = 0.0; 
-float yposOriginal = 0.0;
-float zposOriginal = 0.0;
+float xpos = 0.0; 
+float ypos = 0.0;
+float zpos = 0.0;
 
-float xpos = xposOriginal; 
-float ypos = yposOriginal;
-float zpos = zposOriginal;
+float xrot = 0.0;
+float yrot = 0.0;
+float zrot = 0.0;
 
-float xrotOriginal = 0.0;
-float yrotOriginal = 0.0;
-float zrotOriginal = 0.0; 
-
-float xrot = xrotOriginal;
-float yrot = yrotOriginal;
-float zrot = zrotOriginal; 
-
-float scale = 1.0;
-float rotScale = 1.0; //May need different scales for each direction
-float posScale = 1.0;
+float worldHeadLoc[3];
 
 //Textures and Normals Vars
 GLUquadric* qobj;
@@ -83,7 +77,6 @@ GLfloat specularLight[]    = {1.0, 1.0, 1.0, 1.0};
 
 //Kinect Vars
 HANDLE depthStream;
-HANDLE rgbStream;
 INuiSensor* sensor;
 Vector4 skeletonPosition[NUI_SKELETON_POSITION_COUNT];
 
@@ -93,108 +86,12 @@ bool infoToggle = false;
 
 //Collab 4K tv 142.3 cm Width 80.5 Height
 //Collab Resolution 3840 x 2160
-
 //Laptop 34.5 cm Width 19.5 Height
 //Laptop Resolution 1920 x 1080
 //In centimeters
 int pixelWidth;
 int pixelHeight;
 float pixelRatio;
-
-//Originally in Meters once stored here they are in Centimeters
-float worldHeadLocX = 0; //May need original values scaled to fit coords
-float worldHeadLocY = 0;
-float worldHeadLocZ = 0;
-
-float virtualNearTopLeftLocX;
-float virtualNearTopLeftLocY;
-
-float virtualNearBottomRightLocX;
-float virtualNearBottomRightLocY;
-
-
-float worldFarPlane = 2000.0; //in cm
-float virtualNearPlane = 5.0;
-float virtualFarPlane;
-
-void doCameraUpdate()
-{
-	
-	float worldScreenTopLeftLocX = -screenWidthCm/2; 
-	float worldScreenTopLeftLocY = -screenHeightCm/2; 
-	float worldScreenTopLeftLocZ = 0; 
-
-	float worldScreenBottomRightLocX = screenWidthCm/2;
-	float worldScreenBottomRightLocY = screenHeightCm/2;
-	float worldScreenBottomRightLocZ = 0;
-
-	float virtualScreenTopLeftLocX = worldScreenTopLeftLocX - worldHeadLocX;
-	float virtualScreenTopLeftLocY = worldScreenTopLeftLocY - worldHeadLocY;
-	float virtualScreenTopLeftLocZ = worldScreenTopLeftLocZ - worldHeadLocZ;
-
-	float virtualScreenBottomRightLocX =  worldScreenBottomRightLocX - worldHeadLocX;
-	float virtualScreenBottomRightLocY =  worldScreenBottomRightLocY - worldHeadLocY;
-	float virtualScreenBottomRightLocZ =  worldScreenBottomRightLocZ - worldHeadLocZ;
-
-	virtualFarPlane = worldFarPlane - worldHeadLocZ;
-
-	virtualNearTopLeftLocX = virtualNearPlane/virtualScreenTopLeftLocZ*virtualScreenTopLeftLocX;
-	virtualNearTopLeftLocY = virtualNearPlane/virtualScreenTopLeftLocZ*virtualScreenTopLeftLocY;
-	float virtualNearTopLeftLocZ = virtualNearPlane/virtualScreenTopLeftLocZ*virtualScreenTopLeftLocZ;
-
-	virtualNearBottomRightLocX = virtualScreenBottomRightLocX / virtualScreenBottomRightLocZ * virtualNearPlane;
-	virtualNearBottomRightLocY = virtualScreenBottomRightLocY / virtualScreenBottomRightLocZ * virtualNearPlane;
-	float virtualNearBottomRightLocZ = virtualScreenBottomRightLocZ / virtualScreenBottomRightLocZ * virtualNearPlane;
-	
-	
-
-	glFrustum(virtualNearTopLeftLocX, virtualNearBottomRightLocX, -virtualNearBottomRightLocY, -virtualNearTopLeftLocY, virtualNearPlane, virtualFarPlane);
-}
-
-
-void doCameraUpdateTest()
-{
-	int x = 0;
-	int y = 1;
-	int z = 2;
-
-	int l = 0;
-	int r = 1;
-	int b = 2; 
-	int t = 3;
-	int n = 4;//Not sure how to get near
-	//Center of screen 0,0,0 this should translate to the center of slipping volume being at 0,0,0
-	//Top of screen in reality (-height/2)
-	//Bottom of screen in reality (height/2)
-	//Left of screen in reality (-width/2)
-	//Right of screen in reality (width/2)
-	//Z Loc of screen in reality (0?)
-
-	float frustumScreen[] = {-screenWidthCm/2, screenWidthCm/2, -screenHeightCm/2, screenHeightCm/2, 0}; //0 Could be changed maybe for points in front of screen but 0 for now
-
-	//Point X of head in reality
-	//Point Y of head in reality
-	//Point Z of head in reality
-	float headPoint[] = {skeletonPosition[NUI_SKELETON_POSITION_HEAD].x * 100 + kinectOffsetCm[x], skeletonPosition[NUI_SKELETON_POSITION_HEAD].y * 100 + kinectOffsetCm[y], skeletonPosition[NUI_SKELETON_POSITION_HEAD].z * 100 +  + kinectOffsetCm[z]};
-
-
-	//Near clipping field I think might need to be distance from you to screen (headPosZ - |screenLocationRealityZ| + kinectToScreenDist) (Unless objects in front of screen can happen: 
-		//then it would require a lot of calulations to fake the near plane center to still be at 0,0,0 but when the near plane is somewhere in front of screen (likely multiplying everything by some scale based on how far in front of the screen that is, not sure though
-	//Far clipping feild would be any point out to infinity
-
-	float left = frustumScreen[l] - headPoint[x];
-	float right = frustumScreen[r] - headPoint[x];
-	float bottom = frustumScreen[b] - headPoint[y];
-	float top = frustumScreen[t] - headPoint[y];
-
-	glFrustum(left*pixelRatio, right*pixelRatio, bottom, top, 5.0, 200.0);
-
-	//convert those real world coord into virtual world coords
-	//Right now for testing 1 unit in wcs = 1cm
-	//Use ratio of w and h from viewport for this I think
-
-
-}
 
 //Clean up kinect code some uneeded stuff in here
 bool initKinect() 
@@ -205,21 +102,15 @@ bool initKinect()
     if (NuiCreateSensorByIndex(0, &sensor) < 0) return false;
 
     // Initialize sensor
-    sensor->NuiInitialize(NUI_INITIALIZE_FLAG_USES_DEPTH_AND_PLAYER_INDEX | NUI_INITIALIZE_FLAG_USES_COLOR | NUI_INITIALIZE_FLAG_USES_SKELETON);
-    sensor->NuiImageStreamOpen(NUI_IMAGE_TYPE_DEPTH_AND_PLAYER_INDEX, // Depth camera or rgb camera?
+    sensor->NuiInitialize(NUI_INITIALIZE_FLAG_USES_SKELETON);
+    sensor->NuiImageStreamOpen(NUI_IMAGE_TYPE_DEPTH_AND_PLAYER_INDEX, // Depth camera
         NUI_IMAGE_RESOLUTION_640x480,                // Image resolution
         0,        // Image stream flags, e.g. near mode
-        2,        // Number of frames to buffer
+        0,        // Number of frames to buffer
         NULL,     // Event handle
         &depthStream);
-	sensor->NuiImageStreamOpen(NUI_IMAGE_TYPE_COLOR, // Depth camera or rgb camera?
-        NUI_IMAGE_RESOLUTION_640x480,                // Image resolution
-        0,      // Image stream flags, e.g. near mode
-        2,      // Number of frames to buffer
-        NULL,   // Event handle
-		&rgbStream);
 	sensor->NuiSkeletonTrackingEnable(NULL, NUI_SKELETON_TRACKING_FLAG_ENABLE_SEATED_SUPPORT); // NUI_SKELETON_TRACKING_FLAG_ENABLE_SEATED_SUPPORT for only upper body
-    return sensor;
+    return true;
 }
 
 void getSkeletalData() 
@@ -486,95 +377,92 @@ void keyboard (unsigned char key, int x, int y) {
 		case  27:  
 			exit (0);
 		case 'w': 
-			zposOriginal += 1;
+			zpos += 1;
 			glutPostRedisplay();  
 			break;
 		case 's': 
-			zposOriginal -= 1;
+			zpos -= 1;
 			glutPostRedisplay();  
 			break;
 		case 'a': 
-			xposOriginal += 1;
+			xpos += 1;
 			glutPostRedisplay();  
 			break;
 		case 'd': 
-			xposOriginal -= 1;
+			xpos -= 1;
 			glutPostRedisplay();  
 			break;
 		case 'q': 
-			yposOriginal += 1;
+			ypos += 1;
 			glutPostRedisplay();  
 			break;
 		case 'e': 
-			yposOriginal -= 1;
+			ypos -= 1;
 			glutPostRedisplay();  
 			break;
 		case 'p':
-			cout << "xposOriginal = " << xposOriginal << endl; 
-			cout << "yposOriginal = " << yposOriginal << endl;
-			cout << "zposOriginal = " << zposOriginal << endl;
-
 			cout << "xpos = " << xpos << endl; 
-			cout << "ypos = " << xpos << endl;
-			cout << "zpos = " << xpos << endl;
+			cout << "ypos = " << ypos << endl;
+			cout << "zpos = " << zpos << endl;
 
 			cout << "xrot = " << xrot << endl;
 			cout << "yrot = " << yrot << endl;
-			cout << "zrot = " << zrot << endl; 
+			cout << "zrot = " << zrot << endl;
 
-			cout << "scale = " << scale << endl;
-			cout << "rotScale = " << rotScale << endl;
-			cout << "posScale = " << posScale << endl;
+			cout << "worldHeadLoc[x] = " << worldHeadLoc[X] << endl;
+			cout << "worldHeadLoc[x] = " << worldHeadLoc[Y] << endl;
+			cout << "worldHeadLoc[x] = " << worldHeadLoc[Z] << endl;
+
 			break;
 		case 'i':
 			infoToggle = !infoToggle;
 			break;
 		case 'W': 
-			xrotOriginal += 1;
+			xrot += 1;
 			glutPostRedisplay();  
 			break;
 		case 'S': 
-			xrotOriginal -= 1;
+			xrot -= 1;
 			glutPostRedisplay();  
 			break;
 		case 'A': 
-			yrotOriginal -= 1;
+			yrot -= 1;
 			glutPostRedisplay();  
 			break;
 		case 'D': 
-			yrotOriginal += 1;
+			yrot += 1;
 			glutPostRedisplay();  
 			break;
 		case 'Q': 
-			scale -= .25;
+			zrot -= 1;
 			glutPostRedisplay();  
 			break;
 		case 'E': 
-			scale += .25;
+			zrot += 1;
 			glutPostRedisplay();  
 			break;
 		case '7': 
-			worldHeadLocZ += .25;
+			worldHeadLoc[Z] += 10;
 			glutPostRedisplay(); 
 			break;
 		case '9': 
-			worldHeadLocZ -= .25;
+			worldHeadLoc[Z] -= 10;
 			glutPostRedisplay();
 			break;
 		case '8': 
-			worldHeadLocX += .25;
+			worldHeadLoc[X] += 10;
 			glutPostRedisplay();
 			break;
 		case '5': 
-			worldHeadLocX -= .25;
+			worldHeadLoc[X] -= 10;
 			glutPostRedisplay();
 			break;
 		case '4': 
-			worldHeadLocY -= .25;
+			worldHeadLoc[Y] -= 10;
 			glutPostRedisplay();
 			break;
 		case '6': 
-			worldHeadLocY += .25;
+			worldHeadLoc[Y] += 10;
 			glutPostRedisplay();
 			break;
 		case ' ':
@@ -597,58 +485,43 @@ void display()
     glClear(GL_COLOR_BUFFER_BIT|GL_DEPTH_BUFFER_BIT);
     glMatrixMode(GL_MODELVIEW);
 	glLoadIdentity();
-    //gluLookAt(10.0, 6.0, 0.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0);
     
 
 	if(sensor)
 	{
-		//do head position update
-		getSkeletalData();//grab skeleton data
+		//If ready update kinect
+		getSkeletalData();
 
-		//get real world coords and store them appropriately 
-		worldHeadLocX = skeletonPosition[NUI_SKELETON_POSITION_HEAD].x * 100; //grab head positions and convert to cm do kinect offset to screen here
-		worldHeadLocY = skeletonPosition[NUI_SKELETON_POSITION_HEAD].y * 100;		
-		worldHeadLocZ = skeletonPosition[NUI_SKELETON_POSITION_HEAD].z * 100;
-
-
-
-		//change using rotates
-		//xrot = ((atan(-skeletonPosition[NUI_SKELETON_POSITION_HEAD].z/(-skeletonPosition[NUI_SKELETON_POSITION_HEAD].y)) * 360) / PI) * rotScale;
-		//yrot = -((atan(skeletonPosition[NUI_SKELETON_POSITION_HEAD].z/(-skeletonPosition[NUI_SKELETON_POSITION_HEAD].x)) * 360) / PI) * rotScale;
-
-
-		//change using gluLookAt
-		//glRotatef(90, 0, 1, 0);
-		//gluLookAt(skeletonPosition[NUI_SKELETON_POSITION_HEAD].x, skeletonPosition[NUI_SKELETON_POSITION_HEAD].y, -skeletonPosition[NUI_SKELETON_POSITION_HEAD].z, 0.0, 0.0, 0.0, 0, 1, 0);
-
-
+		//grab head positions and convert to cm, offset values based on where the kinect is relative to screen
+		worldHeadLoc[X] = skeletonPosition[NUI_SKELETON_POSITION_HEAD].x * 100 + kinectOffsetCm[X];
+		worldHeadLoc[Y] = skeletonPosition[NUI_SKELETON_POSITION_HEAD].y * 100 + kinectOffsetCm[Y];
+		worldHeadLoc[Z] = skeletonPosition[NUI_SKELETON_POSITION_HEAD].z * 100 + kinectOffsetCm[Z]; 
 
 		if(infoToggle)
 		{
-			cout << worldHeadLocX << "      " << worldHeadLocY << "      " << worldHeadLocZ << endl;
+			cout << worldHeadLoc[X] << "      " << worldHeadLoc[Y] << "      " << worldHeadLoc[Z] << endl;
 	
 		}
 	}
-		//Old code each track type seperated by new line, rot was the most tested		
-		//change based on pos
-	//glTranslatef (xposOriginal -worldHeadLocX, yposOriginal -worldHeadLocY, zposOriginal -worldHeadLocZ);  // Translations.
+	
+	// Translations
+	//glTranslatef (xpos, ypos, zpos);  
 
-	glRotatef (zrotOriginal + zrot, 0,0,1);        // Rotations.
-	glRotatef (yrotOriginal + yrot, 0,1,0);
-	glRotatef (xrotOriginal + xrot, 1,0,0);
+	// Rotations
+	glRotatef (zrot, 0,0,1);        
+	glRotatef (yrot, 0,1,0);
+	glRotatef (xrot, 1,0,0);
 
-
-    glScalef (scale, scale, scale);
+	//Draw Scene
     spheres();
 	scene();	
+
 	glMatrixMode(GL_PROJECTION);
 	glLoadIdentity();
-	glFrustum((-1.0*pixelRatio - worldHeadLocX/100), (1.0*pixelRatio - worldHeadLocX/100), (-1.0 - worldHeadLocY/100), (1.0 - worldHeadLocY/100), 1.0 + worldHeadLocZ/100, 2000.0);
+	glFrustum((-pixelRatio - worldHeadLoc[X]/100), (pixelRatio - worldHeadLoc[X]/100), (-1.0 - worldHeadLoc[Y]/100), (1.0 - worldHeadLoc[Y]/100), 1.0 + worldHeadLoc[Z]/100, 2000.0);
 	//glFrustum((-1.0*pixelRatio - 0), (1.0*pixelRatio - 0), (-1.0 - 0), (1.0 - 0), 1.0 + 0, 2000.0);
-	gluLookAt(xposOriginal + worldHeadLocX, yposOriginal + worldHeadLocY, zposOriginal + worldHeadLocZ, 0, 0, 0, 0, 1, 0);
-	//doCameraUpdate();
-	//doCameraUpdateTest();
-	//light position needs to rotate
+	gluLookAt(xpos + worldHeadLoc[X], ypos + worldHeadLoc[Y], zpos + worldHeadLoc[Z], 0, 0, 0, 0, 1, 0);
+
 	glutSwapBuffers();
     
 }
@@ -663,7 +536,6 @@ void reshape(int w, int h)
 	//glMatrixMode(GL_PROJECTION);
 	//glLoadIdentity();
 	//glOrtho(-20.0, 20.0, -20.0, 20.0, -20.0, 230.0); //Old parallel projection
-	//gluPerspective(10, w/h, 10, 100);
 	//glFrustum(-1.0*w/h, 1.0*w/h, -1.0, 1.0, 5.0, 2000.0); //first frustrum
 	//doCameraUpdate();
 }
