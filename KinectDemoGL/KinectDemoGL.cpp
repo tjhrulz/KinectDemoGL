@@ -25,7 +25,7 @@ const int TEXTURECOUNT = 1;
 const double PI = 3.14159265358979323846;
 const float screenWidthCm = 142.3;
 const float screenHeightCm = 80.5;
-const float kinectOffsetCm[3] = {0,-46,0};
+const float kinectOffsetCm[3] = {0,-42,0};
 
 const int X = 0;
 const int Y = 1;
@@ -364,11 +364,11 @@ void keyboard (unsigned char key, int x, int y) {
 		case  27:  
 			exit (0);
 		case 'w': 
-			zpos += 1;
+			zpos += 10;
 			glutPostRedisplay();  
 			break;
 		case 's': 
-			zpos -= 1;
+			zpos -= 10;
 			glutPostRedisplay();  
 			break;
 		case 'a': 
@@ -505,8 +505,11 @@ void display()
 
 	glMatrixMode(GL_PROJECTION);
 	glLoadIdentity();
-	glFrustum((-1 * pixelRatio - worldHeadLoc[X]/100), (1 * pixelRatio - worldHeadLoc[X]/100), (-1.0 - worldHeadLoc[Y]/100), (1.0 - worldHeadLoc[Y]/100), 5.0 + worldHeadLoc[Z]/100, 2000.0);
-	gluLookAt(xpos + worldHeadLoc[X]/4, ypos + worldHeadLoc[Y]/4, zpos + worldHeadLoc[Z]/4, 0, 0, 0, 0, 1, 0);
+	glFrustum((-1 * pixelRatio - worldHeadLoc[X]/1000), (1 * pixelRatio - worldHeadLoc[X]/1000), (-1.0 - worldHeadLoc[Y]/1000), (1.0 - worldHeadLoc[Y]/1000), 25.0 + worldHeadLoc[Z]/1000, 200000.0);
+	gluLookAt(xpos + worldHeadLoc[X]*1, ypos + worldHeadLoc[Y]*1, zpos + worldHeadLoc[Z]*1, 0, 0, 0, 0, 1, 0);
+
+	//glFrustum((-screenWidthCm - worldHeadLoc[X]) / 100, (screenWidthCm - worldHeadLoc[X]) / 100, (-screenHeightCm - worldHeadLoc[Y]) / 100, (screenHeightCm - worldHeadLoc[Y]) / 100, 50.0 + worldHeadLoc[Z]/100, 200000.0); 
+	//gluLookAt(xpos + worldHeadLoc[X]/1, ypos + worldHeadLoc[Y]/1, zpos + worldHeadLoc[Z]/1, 0, 0, 0, 0, 1, 0);
 
 	glutSwapBuffers();
     
