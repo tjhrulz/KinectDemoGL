@@ -18,10 +18,11 @@
 
 #include <math.h>
 #include <iostream>
+#include <string>
 using namespace std;
 
 
-const int TEXTURECOUNT = 1;
+const int TEXTURECOUNT = 500;
 const double PI = 3.14159265358979323846;
 const float screenWidthCm = 142.3;
 const float screenHeightCm = 80.5;
@@ -50,10 +51,11 @@ float zrot = 0.0;
 float worldHeadLoc[3];
 
 //Textures and Normals Vars
-GLuint* image[TEXTURECOUNT];
-GLuint texture[TEXTURECOUNT];
-int textureWidth[TEXTURECOUNT];
-int textureHeight[TEXTURECOUNT];
+unsigned int textureWidth[TEXTURECOUNT];
+unsigned int textureHeight[TEXTURECOUNT];
+char * textureData[TEXTURECOUNT];
+GLuint textureID[TEXTURECOUNT];
+int textureToLoad = 0;
 
 //Lighting Vars
 GLfloat lightPosition[]    = {screenWidthCm, screenHeightCm, 50, 0.0};
@@ -111,107 +113,78 @@ bool initKinect()
 }
 
 void getSkeletalData() 
-{
-	NUI_SKELETON_FRAME skeletonFrame = {0};
-    if (sensor->NuiSkeletonGetNextFrame(0, &skeletonFrame) >= 0) 
-	{	
-		sensor->NuiTransformSmooth(&skeletonFrame, NULL);
-		// Loop over all sensed skeletons
-		for (int z = 0; z < NUI_SKELETON_COUNT; ++z) 
-		{
-			const NUI_SKELETON_DATA& skeleton = skeletonFrame.SkeletonData[z];
-			// Check the state of the skeleton
-			if (skeleton.eTrackingState == NUI_SKELETON_TRACKED) 
-			{			
+{	
+	if(sensor)
+	{
+		NUI_SKELETON_FRAME skeletonFrame = {0};
+		if (sensor->NuiSkeletonGetNextFrame(0, &skeletonFrame) >= 0) 
+		{	
+			sensor->NuiTransformSmooth(&skeletonFrame, NULL);
+			// Loop over all sensed skeletons
+			for (int z = 0; z < NUI_SKELETON_COUNT; ++z) 
+			{
+				const NUI_SKELETON_DATA& skeleton = skeletonFrame.SkeletonData[z];
+				// Check the state of the skeleton
+				if (skeleton.eTrackingState == NUI_SKELETON_TRACKED) 
+				{			
 				
-				skeletonPosition[NUI_SKELETON_POSITION_HEAD] = skeleton.SkeletonPositions[NUI_SKELETON_POSITION_HEAD];
-				if (skeleton.eSkeletonPositionTrackingState[NUI_SKELETON_POSITION_HEAD] == NUI_SKELETON_POSITION_NOT_TRACKED) 
-				{
-					skeletonPosition[NUI_SKELETON_POSITION_HEAD].w = 0;
+					skeletonPosition[NUI_SKELETON_POSITION_HEAD] = skeleton.SkeletonPositions[NUI_SKELETON_POSITION_HEAD];
+					if (skeleton.eSkeletonPositionTrackingState[NUI_SKELETON_POSITION_HEAD] == NUI_SKELETON_POSITION_NOT_TRACKED) 
+					{
+						skeletonPosition[NUI_SKELETON_POSITION_HEAD].w = 0;
+					}
+					glutPostRedisplay();
+					return; // Only take the data for one skeleton
 				}
-				glutPostRedisplay();
-				return; // Only take the data for one skeleton
 			}
 		}
 	}
 }
-/*
-HANDLE doSceneUpdate()
-{
-	glutPostRedisplay();
-}*/
 
-void initTextures(char FileName[256])
+void initTexturesBmp(string baseFileName)
 {
-	//Code from CPSC 456 class at SRU originally written in C and adopted to C++ 
-   
-	for(int count = 0; count < TEXTURECOUNT; count++)
+	//Load in all the textures
+	while(textureToLoad < TEXTURECOUNT)
 	{
-		float n = 0;
-		float s;
+		char header[54]; //How large the header should be in a bmp
+		int dataPos; //Where the image starts     
+		int imageSize; //How many pixels are there
 
 
-		FILE *fd;
-		int k, nm;
-		int i;
-		char b[256];
-		for(int j = 0; j < 256; j++)
+		string fileName = baseFileName + " (" + std::to_string(static_cast<long long>(textureToLoad+1)) + ").bmp";	//Take the base image name and add on the counting system which is image (x+1).bmp (Easy to rename on widows like that
+		//Right now this is hard coded until I can figure out a platform agnostic way to programatically get the name of every image in a folder		
+
+ 		FILE * file = fopen(fileName.c_str(),"rb"); //Convert string to char and open it Using fopen since openGL expects char* not strings
+		if (!file)
 		{
-			 b[j]= FileName[j];
-		}
-		int redPixel, greenPixel, bluePixel;
-		char c;
-		fd = fopen(FileName, "r");
-		if(fd == NULL)
-		{
-			printf("%s is not in current directory\n", b);
+			//File could not be found
+			cout << "Image could not be found/opened" << endl;; 
 			system("pause");
+			exit(0);
 		}
-		// check first line for P3
-		fscanf(fd, "%[^\n]", b);
-		
-		if (b[0] != 'P' || b[1] != '3') {
-				 printf("%s is not a PPM file\n", b);
-				 system("pause");
-				 exit(0);
-				 }
-		// skip comments
-		fscanf(fd, "%c%c", &c, &c);
-		while (c == '#') {
-			  fscanf(fd, "%[^\n]", b);
-			  fscanf(fd, "%c%c", &c, &c);
-		}
-    
-		// put back first character of first non-comment line
-		ungetc(c, fd);
-		// read file info
-		fscanf(fd, "%d %d %d", &textureWidth, &textureHeight, &k);
-    
-		nm = textureWidth[count] * textureHeight[count]; // overall size
-    
-		image[count] = (GLuint*) malloc(3*sizeof(GLuint)*nm);
-    
-		s = 255./k;
-    
-		for (i=0; i < (nm); i++) 
+		if (fread(header, 1, 54, file)!=54 ||  header[0]!='B' || header[1]!='M' )
 		{
-			fscanf(fd, "%d %d %d", &redPixel, &greenPixel, &bluePixel);
-			image[count][3*nm - 3*i - 3] = redPixel;
-			image[count][3*nm - 3*i - 2] = greenPixel;
-			image[count][3*nm - 3*i - 1] = bluePixel;
-			//printf("(%d, %d, %d)\n", redPixel, greenPixel, bluePixel);
-			//system("pause");
+			cout << "BMP file is not formated correctly" << endl;
+			system("pause");
+			exit(0);
 		}
+		dataPos    = *(int*)&(header[0x0A]);
+		imageSize  = *(int*)&(header[0x22]);
+		textureWidth[textureToLoad]      = *(int*)&(header[0x12]);
+		textureHeight[textureToLoad]     = *(int*)&(header[0x16]);
 
-		glGenTextures(1, &texture[count]);
-		glBindTexture(GL_TEXTURE_2D, texture[count]);
+		textureData[textureToLoad] = new char [imageSize]; //Where the data for each image will be stored allocate for current image size (Jagged Array)
+ 
+		fread(textureData[textureToLoad],1,imageSize,file); //Load in the data from the image to appropriate array location
+ 
+		fclose(file); //Clean up unneeded resources
 
-		glPixelTransferf(GL_RED_SCALE, s);
-		glPixelTransferf(GL_GREEN_SCALE, s);
-		glPixelTransferf(GL_BLUE_SCALE, s);
-		glPixelStorei(GL_UNPACK_SWAP_BYTES, GL_TRUE);
-		glPixelStorei(GL_UNPACK_ALIGNMENT, 1);
+		glGenTextures(1, &textureID[textureToLoad]);
+ 
+		textureToLoad++;
+		cout << "Texture Number: " << textureToLoad << endl;
 	}
+	textureToLoad = 0;
 }
 
 
@@ -291,32 +264,16 @@ void spheres()
 
 void scene()
 {
-    glEnable(GL_LIGHTING);
-    glEnable(GL_LIGHT0);
-
-	glLightfv(GL_LIGHT0, GL_AMBIENT, ambientLight);
-    glLightfv(GL_LIGHT0, GL_DIFFUSE, diffuseLight);
-    glLightfv(GL_LIGHT0, GL_SPECULAR, specularLight);
-    
-    // Set the light position
-    glLightfv(GL_LIGHT0, GL_POSITION, lightPosition);
-
-	//Set light color
-	glMaterialfv(GL_FRONT_AND_BACK, GL_SPECULAR, white);
-	glMaterialf(GL_FRONT_AND_BACK, GL_SHININESS, 20);
-
-	glMaterialfv(GL_FRONT_AND_BACK, GL_AMBIENT, red);
-	glMaterialfv(GL_FRONT_AND_BACK, GL_DIFFUSE, red);
-
 	glEnable(GL_TEXTURE_2D);
-    glTexImage2D(GL_TEXTURE_2D, 0, 3, textureWidth[0], textureHeight[0], 0, GL_RGB, GL_UNSIGNED_INT, image[0]);
+	glTexImage2D(GL_TEXTURE_2D, 0,GL_RGB, textureWidth[textureToLoad], textureHeight[textureToLoad], 0, GL_BGR_EXT, GL_UNSIGNED_BYTE, textureData[textureToLoad]);
+
     glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
     glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
     glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
     glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
 
 	glBegin(GL_QUADS); //Bottom
-		glColor3f(1.0,0.0,0.0);
+		glColor3f(1.0,1.0,1.0);
 		glNormal3d(0, 1, 0); 
 		glTexCoord2f(5.0,5.0);		glVertex3f( screenWidthCm,-screenHeightCm, 2*screenHeightCm);  
 		glTexCoord2f(-5.0,5.0);		glVertex3f( screenWidthCm,-screenHeightCm,-screenHeightCm);
@@ -324,7 +281,7 @@ void scene()
 		glTexCoord2f(5.0,-5.0);		glVertex3f(-screenWidthCm,-screenHeightCm, 2*screenHeightCm);
     glEnd();
 	glBegin(GL_QUADS);//Left
-		glColor3f(1.0,0.0,0.0);
+		glColor3f(1.0,1.0,1.0);
 		glNormal3d(1, 0, 0);
 		glTexCoord2f(-5.0,-5.0);	glVertex3f(-screenWidthCm,-screenHeightCm,-screenHeightCm);
 		glTexCoord2f(-5.0,5.0);		glVertex3f(-screenWidthCm, screenHeightCm,-screenHeightCm); 
@@ -332,7 +289,7 @@ void scene()
 		glTexCoord2f(5.0,-5.0);		glVertex3f(-screenWidthCm,-screenHeightCm, 2*screenHeightCm);
     glEnd();
 	glBegin(GL_QUADS);//Right
-		glColor3f(1.0,0.0,0.0);
+		glColor3f(1.0,1.0,1.0);
 		glNormal3d(-1, 0, 0); 
 		glTexCoord2f(5.0,-5.0);		glVertex3f(screenWidthCm,-screenHeightCm, 2*screenHeightCm);
 		glTexCoord2f(5.0,5.0);		glVertex3f(screenWidthCm, screenHeightCm, 2*screenHeightCm);
@@ -340,7 +297,7 @@ void scene()
 		glTexCoord2f(-5.0,-5.0);	glVertex3f(screenWidthCm,-screenHeightCm,-screenHeightCm);
     glEnd();
 	glBegin(GL_QUADS);//Top
-		glColor3f(1.0,0.0,0.0);
+		glColor3f(1.0,1.0,1.0);
 		glNormal3d(0, -1, 0);
 		glTexCoord2f(-5.0,5.0);		glVertex3f( screenWidthCm,screenHeightCm,-screenHeightCm); 
 		glTexCoord2f(5.0,5.0);		glVertex3f( screenWidthCm,screenHeightCm, 2*screenHeightCm);  
@@ -348,14 +305,20 @@ void scene()
 		glTexCoord2f(-5.0,-5.0);	glVertex3f(-screenWidthCm,screenHeightCm,-screenHeightCm);
     glEnd();
 	glBegin(GL_QUADS); //Back
-		glColor3f(1.0,0.0,0.0);
+		glColor3f(1.0,1.0,1.0);
 		glNormal3d(0, 0, 1);
-		glTexCoord2f(-5.0,5.0);		glVertex3f( screenWidthCm,-screenHeightCm,-screenHeightCm); 
-		glTexCoord2f(5.0,5.0);		glVertex3f( screenWidthCm, screenHeightCm,-screenHeightCm);  
-		glTexCoord2f(5.0,-5.0);		glVertex3f(-screenWidthCm, screenHeightCm,-screenHeightCm);
-		glTexCoord2f(-5.0,-5.0);	glVertex3f(-screenWidthCm,-screenHeightCm,-screenHeightCm);
+		glTexCoord2f(1,-0);		glVertex3f( screenWidthCm,-screenHeightCm,-screenHeightCm); 
+		glTexCoord2f(1,1);		glVertex3f( screenWidthCm, screenHeightCm,-screenHeightCm);  
+		glTexCoord2f(-0,1);		glVertex3f(-screenWidthCm, screenHeightCm,-screenHeightCm);
+		glTexCoord2f(-0,-0);	glVertex3f(-screenWidthCm,-screenHeightCm,-screenHeightCm);
     glEnd();
 	glDisable(GL_TEXTURE_2D);
+
+	textureToLoad++;
+	if(textureToLoad == TEXTURECOUNT)
+	{
+		textureToLoad = 0;
+	}
 }
 
 void keyboard (unsigned char key, int x, int y) {
@@ -474,25 +437,21 @@ void display()
 	glLoadIdentity();
     
 
-	if(sensor)
+
+	//grab head positions and convert to cm, offset values based on where the kinect is relative to screen
+	worldHeadLoc[X] = skeletonPosition[NUI_SKELETON_POSITION_HEAD].x * 100 + kinectOffsetCm[X];
+	worldHeadLoc[Y] = skeletonPosition[NUI_SKELETON_POSITION_HEAD].y * 100 + kinectOffsetCm[Y];
+	worldHeadLoc[Z] = skeletonPosition[NUI_SKELETON_POSITION_HEAD].z * 100 + kinectOffsetCm[Z]; 
+
+	if(infoToggle)
 	{
-		//If ready update kinect
-		getSkeletalData();
-
-		//grab head positions and convert to cm, offset values based on where the kinect is relative to screen
-		worldHeadLoc[X] = skeletonPosition[NUI_SKELETON_POSITION_HEAD].x * 100 + kinectOffsetCm[X];
-		worldHeadLoc[Y] = skeletonPosition[NUI_SKELETON_POSITION_HEAD].y * 100 + kinectOffsetCm[Y];
-		worldHeadLoc[Z] = skeletonPosition[NUI_SKELETON_POSITION_HEAD].z * 100 + kinectOffsetCm[Z]; 
-
-		if(infoToggle)
-		{
-			cout << worldHeadLoc[X] << "      " << worldHeadLoc[Y] << "      " << worldHeadLoc[Z] << endl;
+		cout << worldHeadLoc[X] << "      " << worldHeadLoc[Y] << "      " << worldHeadLoc[Z] << endl;
 	
-		}
 	}
+
 	
 	// Translations
-	glTranslatef (xpos, ypos, zpos);  
+	//glTranslatef (xpos, ypos, zpos);  
 
 	// Rotations
 	glRotatef (zrot, 0,0,1);        
@@ -508,15 +467,15 @@ void display()
 	glLoadIdentity();
 
 	//Functional
-	//glFrustum((-1 * pixelRatio - worldHeadLoc[X]/1000), (1 * pixelRatio - worldHeadLoc[X]/1000), (-1.0 - worldHeadLoc[Y]/1000), (1.0 - worldHeadLoc[Y]/1000), 25.0 + worldHeadLoc[Z]/1000, 200000.0);
-	//gluLookAt(xpos + worldHeadLoc[X]*1, ypos + worldHeadLoc[Y]*1, zpos + worldHeadLoc[Z]*1, 0, 0, 0, 0, 1, 0);
+	glFrustum((-1 * pixelRatio - worldHeadLoc[X]/1000), (1 * pixelRatio - worldHeadLoc[X]/1000), (-1.0 - worldHeadLoc[Y]/1000), (1.0 - worldHeadLoc[Y]/1000),  1 + worldHeadLoc[Z]/1000, 200000.0);
+	gluLookAt(xpos + worldHeadLoc[X]*1, ypos + worldHeadLoc[Y]*1, zpos + worldHeadLoc[Z]*1, 0, 0, 0, 0, 1, 0);
 	
 	//Beta Improvement
 	//glFrustum((worldHeadLoc[X]/(screenWidthCm/2)), (worldHeadLoc[X]) / 100, (-screenHeightCm - worldHeadLoc[Y]) / 100, (screenHeightCm - worldHeadLoc[Y]) / 100, 5.0 + worldHeadLoc[Z]/100, 200000.0); 
 	//gluLookAt(xpos + worldHeadLoc[X]/1, ypos + worldHeadLoc[Y]/1, zpos + worldHeadLoc[Z]/1, 0, 0, 0, 0, 1, 0);
 
 	//Half done
-	
+	/*
 	float nearPlane = worldHeadLoc[Z]/200;
 	float farPlane = 100000.0;
 	float fov = tan( 30 * PI / 360);
@@ -533,7 +492,7 @@ void display()
 	glMatrixMode(GL_MODELVIEW);
 	glLoadIdentity();
     glTranslatef( 0.0, 0.0, dis);
-	
+	*/
 	glutSwapBuffers();
     
 }
@@ -578,8 +537,8 @@ int main(int argc, char** argv)
 	
 	init();
 
-	initTextures("checkerboard.ppm");
-
+	initTexturesBmp("textures\\bay\\bayScene");
+	//initTexturesBmp("checkerboard");
 	
 	//updatePosition(1);
 	glutMainLoop();   
