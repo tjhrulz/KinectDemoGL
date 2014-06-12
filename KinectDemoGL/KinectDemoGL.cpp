@@ -175,6 +175,7 @@ void initTexturesBmp(string baseFileName)
 
 		textureData[textureToLoad] = new char [imageSize]; //Where the data for each image will be stored allocate for current image size (Jagged Array)
  
+		fseek(file, dataPos-54, SEEK_CUR);
 		fread(textureData[textureToLoad],1,imageSize,file); //Load in the data from the image to appropriate array location
  
 		fclose(file); //Clean up unneeded resources
@@ -191,6 +192,8 @@ void initTexturesBmp(string baseFileName)
 
 void spheres()
 {
+	glPushMatrix();
+	glTranslatef(0,0,-2*screenHeightCm);
     // Enable lighting
     glEnable(GL_LIGHTING);
     glEnable(GL_LIGHT0);
@@ -319,6 +322,7 @@ void scene()
 	{
 		textureToLoad = 0;
 	}
+	glPopMatrix();
 }
 
 void keyboard (unsigned char key, int x, int y) {
