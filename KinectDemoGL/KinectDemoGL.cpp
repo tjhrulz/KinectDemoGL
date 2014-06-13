@@ -8,6 +8,8 @@
 #include <Ole2.h>
 
 //GLUT and OpenGL things
+#include <gl/GL.h>
+#include <gl/GLU.h>
 #include <GL/glut.h>
 
 //Kinect things
@@ -21,12 +23,13 @@
 #include <string>
 using namespace std;
 
-
-const int TEXTURECOUNT = 500;
+const int BLURFREQUENCY = 1;
+const int TEXTURECOUNT = 401;
 const double PI = 3.14159265358979323846;
-const float screenWidthCm = 142.3;
-const float screenHeightCm = 80.5;
-const float kinectOffsetCm[3] = {0,-46,0};
+const float screenWidthCm = 34.5;
+const float screenHeightCm = 19.5;
+const float kinectOffsetCm[3] = {0,20,0};
+const int BMPHEADERSIZE = 54;
 
 const int X = 0;
 const int Y = 1;
@@ -51,11 +54,12 @@ float zrot = 0.0;
 float worldHeadLoc[3];
 
 //Textures and Normals Vars
-unsigned int textureWidth[TEXTURECOUNT];
-unsigned int textureHeight[TEXTURECOUNT];
+int textureWidth[TEXTURECOUNT];
+int textureHeight[TEXTURECOUNT];
 char * textureData[TEXTURECOUNT];
 GLuint textureID[TEXTURECOUNT];
 int textureToLoad = 0;
+int blendsTillTexture = 0;
 
 //Lighting Vars
 GLfloat lightPosition[]    = {screenWidthCm, screenHeightCm, 50, 0.0};
@@ -146,7 +150,7 @@ void initTexturesBmp(string baseFileName)
 	//Load in all the textures
 	while(textureToLoad < TEXTURECOUNT)
 	{
-		char header[54]; //How large the header should be in a bmp
+		char header[BMPHEADERSIZE]; //How large the header should be in a bmp
 		int dataPos; //Where the image starts     
 		int imageSize; //How many pixels are there
 
@@ -175,12 +179,13 @@ void initTexturesBmp(string baseFileName)
 
 		textureData[textureToLoad] = new char [imageSize]; //Where the data for each image will be stored allocate for current image size (Jagged Array)
  
-		fseek(file, dataPos-54, SEEK_CUR);
+		fseek(file, dataPos-BMPHEADERSIZE, SEEK_CUR);
 		fread(textureData[textureToLoad],1,imageSize,file); //Load in the data from the image to appropriate array location
  
 		fclose(file); //Clean up unneeded resources
 
 		glGenTextures(1, &textureID[textureToLoad]);
+
  
 		textureToLoad++;
 		cout << "Texture Number: " << textureToLoad << endl;
@@ -267,13 +272,15 @@ void spheres()
 
 void scene()
 {
+
 	glEnable(GL_TEXTURE_2D);
+
 	glTexImage2D(GL_TEXTURE_2D, 0,GL_RGB, textureWidth[textureToLoad], textureHeight[textureToLoad], 0, GL_BGR_EXT, GL_UNSIGNED_BYTE, textureData[textureToLoad]);
 
-    glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
-    glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
-    glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
-    glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+	glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
+	glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
+	glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+	glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
 
 	glBegin(GL_QUADS); //Bottom
 		glColor3f(1.0,1.0,1.0);
@@ -315,13 +322,46 @@ void scene()
 		glTexCoord2f(-0,1);		glVertex3f(-screenWidthCm, screenHeightCm,-screenHeightCm);
 		glTexCoord2f(-0,-0);	glVertex3f(-screenWidthCm,-screenHeightCm,-screenHeightCm);
     glEnd();
-	glDisable(GL_TEXTURE_2D);
 
-	textureToLoad++;
+	if(blendsTillTexture == BLURFREQUENCY)
+	{
+		cout << "Dont do blend " << textureToLoad << endl;
+		blendsTillTexture = 0;
+
+		textureToLoad ++;
+	}
+	else
+	{
+		glEnable(GL_BLEND);
+		//glBlendFunc(GL_ONE_MINUS_DST_COLOR, GL_ONE_MINUS_SRC_COLOR);
+		//glBlendFunc(GL_SRC_COLOR, GL_DST_COLOR);
+		glBlendFunc(GL_ONE, GL_ONE_MINUS_SRC_COLOR);
+		//glBlendFunc(GL_SRC_COLOR ,GL_ONE_MINUS_SRC_COLOR );
+		
+		glTexImage2D(GL_TEXTURE_2D, 0,GL_RGB, textureWidth[textureToLoad-1], textureHeight[textureToLoad-1], 0, GL_BGR_EXT, GL_UNSIGNED_BYTE, textureData[textureToLoad-1]);
+		glBegin(GL_QUADS); //Back
+			glColor3f(1.0,1.0,1.0);
+			glNormal3d(0, 0, 1);
+			glTexCoord2f(1,-0);		glVertex3f( screenWidthCm,-screenHeightCm,-screenHeightCm+.01); 
+			glTexCoord2f(1,1);		glVertex3f( screenWidthCm, screenHeightCm,-screenHeightCm+.01);  
+			glTexCoord2f(-0,1);		glVertex3f(-screenWidthCm, screenHeightCm,-screenHeightCm+.01);
+			glTexCoord2f(-0,-0);	glVertex3f(-screenWidthCm,-screenHeightCm,-screenHeightCm+.01);
+		glEnd();
+
+
+		cout << "Do blend " << blendsTillTexture << endl;
+		blendsTillTexture ++;
+		
+
+	}	
+
 	if(textureToLoad == TEXTURECOUNT)
 	{
 		textureToLoad = 0;
 	}
+
+	glDisable(GL_TEXTURE_2D);
+	glDisable(GL_BLEND);
 	glPopMatrix();
 }
 
@@ -370,6 +410,9 @@ void keyboard (unsigned char key, int x, int y) {
 			break;
 		case 'i':
 			infoToggle = !infoToggle;
+			break;
+		case 'r':
+			glutPostRedisplay();
 			break;
 		case 'W': 
 			xrot += 1;
@@ -452,7 +495,7 @@ void display()
 		cout << worldHeadLoc[X] << "      " << worldHeadLoc[Y] << "      " << worldHeadLoc[Z] << endl;
 	
 	}
-
+	
 	
 	// Translations
 	//glTranslatef (xpos, ypos, zpos);  
@@ -471,12 +514,12 @@ void display()
 	glLoadIdentity();
 
 	//Functional
-	glFrustum((-1 * pixelRatio - worldHeadLoc[X]/1000), (1 * pixelRatio - worldHeadLoc[X]/1000), (-1.0 - worldHeadLoc[Y]/1000), (1.0 - worldHeadLoc[Y]/1000),  1 + worldHeadLoc[Z]/1000, 200000.0);
+	glFrustum((-1 * pixelRatio - worldHeadLoc[X]/1000), (1 * pixelRatio - worldHeadLoc[X]/1000), (-1.0 - worldHeadLoc[Y]/1000), (1.0 - worldHeadLoc[Y]/1000),  3 + worldHeadLoc[Z]/1000, 200000.0);
 	gluLookAt(xpos + worldHeadLoc[X]*1, ypos + worldHeadLoc[Y]*1, zpos + worldHeadLoc[Z]*1, 0, 0, 0, 0, 1, 0);
 	
 	//Beta Improvement
-	//glFrustum((worldHeadLoc[X]/(screenWidthCm/2)), (worldHeadLoc[X]) / 100, (-screenHeightCm - worldHeadLoc[Y]) / 100, (screenHeightCm - worldHeadLoc[Y]) / 100, 5.0 + worldHeadLoc[Z]/100, 200000.0); 
-	//gluLookAt(xpos + worldHeadLoc[X]/1, ypos + worldHeadLoc[Y]/1, zpos + worldHeadLoc[Z]/1, 0, 0, 0, 0, 1, 0);
+	//glFrustum((-1 * pixelRatio), (1 * pixelRatio), (-1.0), (1.0),  5, 200000.0);
+	//gluLookAt(xpos + worldHeadLoc[X]*1, ypos + worldHeadLoc[Y]*1, zpos + worldHeadLoc[Z]*1, 0, 0, 0, 0, 1, 0);
 
 	//Half done
 	/*
