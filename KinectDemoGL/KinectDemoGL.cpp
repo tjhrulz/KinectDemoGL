@@ -23,12 +23,12 @@
 #include <string>
 using namespace std;
 
-const int BLURFREQUENCY = 1;
-const int TEXTURECOUNT = 401;
+const int BLURFREQUENCY = 0;
+const int TEXTURECOUNT = 1;
 const double PI = 3.14159265358979323846;
-const float screenWidthCm = 34.5;
-const float screenHeightCm = 19.5;
-const float kinectOffsetCm[3] = {0,20,0};
+const float screenWidthCm = 142.3/2;
+const float screenHeightCm = 80.5/2;
+const float kinectOffsetCm[3] = {0,-40,0};
 const int BMPHEADERSIZE = 54;
 
 const int X = 0;
@@ -95,6 +95,12 @@ bool infoToggle = false;
 int pixelWidth;
 int pixelHeight;
 float pixelRatio;
+
+float ofTesting = 0;
+float ofTesting1 = 0;
+float ofTesting2 = 0;
+float ofTesting3 = 0;
+float ofTesting4 = 0;
 
 //Clean up kinect code some uneeded stuff in here
 bool initKinect() 
@@ -197,7 +203,7 @@ void initTexturesBmp(string baseFileName)
 
 void spheres()
 {
-	glPushMatrix();
+
 	glTranslatef(0,0,-2*screenHeightCm);
     // Enable lighting
     glEnable(GL_LIGHTING);
@@ -286,15 +292,15 @@ void scene()
 		glColor3f(1.0,1.0,1.0);
 		glNormal3d(0, 1, 0); 
 		glTexCoord2f(5.0,5.0);		glVertex3f( screenWidthCm,-screenHeightCm, 2*screenHeightCm);  
-		glTexCoord2f(-5.0,5.0);		glVertex3f( screenWidthCm,-screenHeightCm,-screenHeightCm);
-		glTexCoord2f(-5.0,-5.0);	glVertex3f(-screenWidthCm,-screenHeightCm,-screenHeightCm);
+		glTexCoord2f(-5.0,5.0);		glVertex3f( screenWidthCm,-screenHeightCm,-2*screenHeightCm);
+		glTexCoord2f(-5.0,-5.0);	glVertex3f(-screenWidthCm,-screenHeightCm,-2*screenHeightCm);
 		glTexCoord2f(5.0,-5.0);		glVertex3f(-screenWidthCm,-screenHeightCm, 2*screenHeightCm);
     glEnd();
 	glBegin(GL_QUADS);//Left
 		glColor3f(1.0,1.0,1.0);
 		glNormal3d(1, 0, 0);
-		glTexCoord2f(-5.0,-5.0);	glVertex3f(-screenWidthCm,-screenHeightCm,-screenHeightCm);
-		glTexCoord2f(-5.0,5.0);		glVertex3f(-screenWidthCm, screenHeightCm,-screenHeightCm); 
+		glTexCoord2f(-5.0,-5.0);	glVertex3f(-screenWidthCm,-screenHeightCm,-2*screenHeightCm);
+		glTexCoord2f(-5.0,5.0);		glVertex3f(-screenWidthCm, screenHeightCm,-2*screenHeightCm); 
 		glTexCoord2f(5.0,5.0);		glVertex3f(-screenWidthCm, screenHeightCm, 2*screenHeightCm);  
 		glTexCoord2f(5.0,-5.0);		glVertex3f(-screenWidthCm,-screenHeightCm, 2*screenHeightCm);
     glEnd();
@@ -303,29 +309,29 @@ void scene()
 		glNormal3d(-1, 0, 0); 
 		glTexCoord2f(5.0,-5.0);		glVertex3f(screenWidthCm,-screenHeightCm, 2*screenHeightCm);
 		glTexCoord2f(5.0,5.0);		glVertex3f(screenWidthCm, screenHeightCm, 2*screenHeightCm);
-		glTexCoord2f(-5.0,5.0);		glVertex3f(screenWidthCm, screenHeightCm,-screenHeightCm);
-		glTexCoord2f(-5.0,-5.0);	glVertex3f(screenWidthCm,-screenHeightCm,-screenHeightCm);
+		glTexCoord2f(-5.0,5.0);		glVertex3f(screenWidthCm, screenHeightCm,-2*screenHeightCm);
+		glTexCoord2f(-5.0,-5.0);	glVertex3f(screenWidthCm,-screenHeightCm,-2*screenHeightCm);
     glEnd();
 	glBegin(GL_QUADS);//Top
 		glColor3f(1.0,1.0,1.0);
 		glNormal3d(0, -1, 0);
-		glTexCoord2f(-5.0,5.0);		glVertex3f( screenWidthCm,screenHeightCm,-screenHeightCm); 
+		glTexCoord2f(-5.0,5.0);		glVertex3f( screenWidthCm,screenHeightCm,-2*screenHeightCm); 
 		glTexCoord2f(5.0,5.0);		glVertex3f( screenWidthCm,screenHeightCm, 2*screenHeightCm);  
 		glTexCoord2f(5.0,-5.0);		glVertex3f(-screenWidthCm,screenHeightCm, 2*screenHeightCm);
-		glTexCoord2f(-5.0,-5.0);	glVertex3f(-screenWidthCm,screenHeightCm,-screenHeightCm);
+		glTexCoord2f(-5.0,-5.0);	glVertex3f(-screenWidthCm,screenHeightCm,-2*screenHeightCm);
     glEnd();
 	glBegin(GL_QUADS); //Back
 		glColor3f(1.0,1.0,1.0);
 		glNormal3d(0, 0, 1);
-		glTexCoord2f(1,-0);		glVertex3f( screenWidthCm,-screenHeightCm,-screenHeightCm); 
-		glTexCoord2f(1,1);		glVertex3f( screenWidthCm, screenHeightCm,-screenHeightCm);  
-		glTexCoord2f(-0,1);		glVertex3f(-screenWidthCm, screenHeightCm,-screenHeightCm);
-		glTexCoord2f(-0,-0);	glVertex3f(-screenWidthCm,-screenHeightCm,-screenHeightCm);
+		glTexCoord2f(1,-0);		glVertex3f( screenWidthCm,-screenHeightCm,-2*screenHeightCm); 
+		glTexCoord2f(1,1);		glVertex3f( screenWidthCm, screenHeightCm,-2*screenHeightCm);  
+		glTexCoord2f(-0,1);		glVertex3f(-screenWidthCm, screenHeightCm,-2*screenHeightCm);
+		glTexCoord2f(-0,-0);	glVertex3f(-screenWidthCm,-screenHeightCm,-2*screenHeightCm);
     glEnd();
 
 	if(blendsTillTexture == BLURFREQUENCY)
 	{
-		cout << "Dont do blend " << textureToLoad << endl;
+		//cout << "Dont do blend " << textureToLoad << endl;
 		blendsTillTexture = 0;
 
 		textureToLoad ++;
@@ -335,13 +341,14 @@ void scene()
 		glEnable(GL_BLEND);
 		//glBlendFunc(GL_ONE_MINUS_DST_COLOR, GL_ONE_MINUS_SRC_COLOR);
 		//glBlendFunc(GL_SRC_COLOR, GL_DST_COLOR);
-		glBlendFunc(GL_ONE, GL_ONE_MINUS_SRC_COLOR);
+		//glBlendFunc(GL_ONE, GL_ONE_MINUS_SRC_COLOR);
 		//glBlendFunc(GL_SRC_COLOR ,GL_ONE_MINUS_SRC_COLOR );
-		
+		glBlendFunc(GL_ONE, GL_ONE);
+
 		glTexImage2D(GL_TEXTURE_2D, 0,GL_RGB, textureWidth[textureToLoad-1], textureHeight[textureToLoad-1], 0, GL_BGR_EXT, GL_UNSIGNED_BYTE, textureData[textureToLoad-1]);
 		glBegin(GL_QUADS); //Back
 			glColor3f(1.0,1.0,1.0);
-			glNormal3d(0, 0, 1);
+			glNormal3d(0, 0, 1);		
 			glTexCoord2f(1,-0);		glVertex3f( screenWidthCm,-screenHeightCm,-screenHeightCm+.01); 
 			glTexCoord2f(1,1);		glVertex3f( screenWidthCm, screenHeightCm,-screenHeightCm+.01);  
 			glTexCoord2f(-0,1);		glVertex3f(-screenWidthCm, screenHeightCm,-screenHeightCm+.01);
@@ -349,7 +356,7 @@ void scene()
 		glEnd();
 
 
-		cout << "Do blend " << blendsTillTexture << endl;
+		//cout << "Do blend " << blendsTillTexture << endl;
 		blendsTillTexture ++;
 		
 
@@ -362,7 +369,6 @@ void scene()
 
 	glDisable(GL_TEXTURE_2D);
 	glDisable(GL_BLEND);
-	glPopMatrix();
 }
 
 void keyboard (unsigned char key, int x, int y) {
@@ -439,27 +445,27 @@ void keyboard (unsigned char key, int x, int y) {
 			glutPostRedisplay();  
 			break;
 		case '7': 
-			worldHeadLoc[Z] += 10;
+			ofTesting += 10;
 			glutPostRedisplay(); 
 			break;
-		case '9': 
-			worldHeadLoc[Z] -= 10;
+		case '4': 
+			ofTesting -= 10;
 			glutPostRedisplay();
 			break;
 		case '8': 
-			worldHeadLoc[X] += 10;
+			ofTesting1 += 10;
 			glutPostRedisplay();
 			break;
 		case '5': 
-			worldHeadLoc[X] -= 10;
+			ofTesting1 -= 10;
 			glutPostRedisplay();
 			break;
-		case '4': 
-			worldHeadLoc[Y] -= 10;
+		case '9': 
+			ofTesting2 += 10;
 			glutPostRedisplay();
 			break;
 		case '6': 
-			worldHeadLoc[Y] += 10;
+			ofTesting2 -= 10;
 			glutPostRedisplay();
 			break;
 		case ' ':
@@ -496,30 +502,39 @@ void display()
 	
 	}
 	
-	
-	// Translations
-	//glTranslatef (xpos, ypos, zpos);  
 
-	// Rotations
-	glRotatef (zrot, 0,0,1);        
-	glRotatef (yrot, 0,1,0);
-	glRotatef (xrot, 1,0,0);
-
-
-	//Draw Scene
-    spheres();
-	scene();	
+	glPushMatrix();
+		//Draw Scene
+		spheres();
+		scene();	
+	glPopMatrix();
 
 	glMatrixMode(GL_PROJECTION);
 	glLoadIdentity();
 
 	//Functional
-	glFrustum((-1 * pixelRatio - worldHeadLoc[X]/1000), (1 * pixelRatio - worldHeadLoc[X]/1000), (-1.0 - worldHeadLoc[Y]/1000), (1.0 - worldHeadLoc[Y]/1000),  3 + worldHeadLoc[Z]/1000, 200000.0);
-	gluLookAt(xpos + worldHeadLoc[X]*1, ypos + worldHeadLoc[Y]*1, zpos + worldHeadLoc[Z]*1, 0, 0, 0, 0, 1, 0);
-	
-	//Beta Improvement
-	//glFrustum((-1 * pixelRatio), (1 * pixelRatio), (-1.0), (1.0),  5, 200000.0);
+	//glFrustum((-1 * pixelRatio - worldHeadLoc[X]/1000), (1 * pixelRatio - worldHeadLoc[X]/1000), (-1.0 - worldHeadLoc[Y]/1000), (1.0 - worldHeadLoc[Y]/1000),  3 + worldHeadLoc[Z]/1000, 200000.0);
 	//gluLookAt(xpos + worldHeadLoc[X]*1, ypos + worldHeadLoc[Y]*1, zpos + worldHeadLoc[Z]*1, 0, 0, 0, 0, 1, 0);
+	
+	//Improved Version (WIP)
+	//No Depth
+	glFrustum((-screenWidthCm - worldHeadLoc[X]/1), (screenWidthCm - worldHeadLoc[X]/1), (-screenHeightCm - worldHeadLoc[Y]/1), (screenHeightCm - worldHeadLoc[Y]/1),  .1+ofTesting, 200000.0);
+    gluLookAt(worldHeadLoc[X], worldHeadLoc[Y], 0, worldHeadLoc[X], worldHeadLoc[Y], -1, 0, 1, 0);
+     
+
+	
+	// Translations
+	glTranslatef (xpos, ypos, zpos);
+	
+	// Rotations74777777777777777777777777wwwwwwwwwwwwssssssssssssssssssssssssddasdwasdd774747474744474777777444wasdawsd
+	glRotatef (zrot, 0,0,1);        
+	glRotatef (yrot, 0,1,0);
+	glRotatef (xrot, 1,0,0);
+
+
+	//Only Depth
+	//glFrustum((-screenWidthCm - 0), (screenWidthCm - 0), (-screenHeightCm - 0), (screenHeightCm - 0),  screenHeightCm, 200000.0);
+    //gluLookAt(0, 0, 0, 0, 0, -worldHeadLoc[Z], 0, 1, 0);
 
 	//Half done
 	/*
