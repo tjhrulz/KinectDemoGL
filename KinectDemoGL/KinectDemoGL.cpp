@@ -204,7 +204,7 @@ void initTexturesBmp(string baseFileName)
 void spheres()
 {
 
-	glTranslatef(0,0,-2*screenHeightCm);
+	glTranslatef(0,0,-screenHeightCm);
     // Enable lighting
     glEnable(GL_LIGHTING);
     glEnable(GL_LIGHT0);
@@ -291,24 +291,24 @@ void scene()
 	glBegin(GL_QUADS); //Bottom
 		glColor3f(1.0,1.0,1.0);
 		glNormal3d(0, 1, 0); 
-		glTexCoord2f(5.0,5.0);		glVertex3f( screenWidthCm,-screenHeightCm, 2*screenHeightCm);  
+		glTexCoord2f(5.0,5.0);		glVertex3f( screenWidthCm,-screenHeightCm, screenHeightCm);  
 		glTexCoord2f(-5.0,5.0);		glVertex3f( screenWidthCm,-screenHeightCm,-2*screenHeightCm);
 		glTexCoord2f(-5.0,-5.0);	glVertex3f(-screenWidthCm,-screenHeightCm,-2*screenHeightCm);
-		glTexCoord2f(5.0,-5.0);		glVertex3f(-screenWidthCm,-screenHeightCm, 2*screenHeightCm);
+		glTexCoord2f(5.0,-5.0);		glVertex3f(-screenWidthCm,-screenHeightCm, screenHeightCm);
     glEnd();
 	glBegin(GL_QUADS);//Left
 		glColor3f(1.0,1.0,1.0);
 		glNormal3d(1, 0, 0);
 		glTexCoord2f(-5.0,-5.0);	glVertex3f(-screenWidthCm,-screenHeightCm,-2*screenHeightCm);
 		glTexCoord2f(-5.0,5.0);		glVertex3f(-screenWidthCm, screenHeightCm,-2*screenHeightCm); 
-		glTexCoord2f(5.0,5.0);		glVertex3f(-screenWidthCm, screenHeightCm, 2*screenHeightCm);  
-		glTexCoord2f(5.0,-5.0);		glVertex3f(-screenWidthCm,-screenHeightCm, 2*screenHeightCm);
+		glTexCoord2f(5.0,5.0);		glVertex3f(-screenWidthCm, screenHeightCm, screenHeightCm);  
+		glTexCoord2f(5.0,-5.0);		glVertex3f(-screenWidthCm,-screenHeightCm, screenHeightCm);
     glEnd();
 	glBegin(GL_QUADS);//Right
 		glColor3f(1.0,1.0,1.0);
 		glNormal3d(-1, 0, 0); 
-		glTexCoord2f(5.0,-5.0);		glVertex3f(screenWidthCm,-screenHeightCm, 2*screenHeightCm);
-		glTexCoord2f(5.0,5.0);		glVertex3f(screenWidthCm, screenHeightCm, 2*screenHeightCm);
+		glTexCoord2f(5.0,-5.0);		glVertex3f(screenWidthCm,-screenHeightCm, screenHeightCm);
+		glTexCoord2f(5.0,5.0);		glVertex3f(screenWidthCm, screenHeightCm, screenHeightCm);
 		glTexCoord2f(-5.0,5.0);		glVertex3f(screenWidthCm, screenHeightCm,-2*screenHeightCm);
 		glTexCoord2f(-5.0,-5.0);	glVertex3f(screenWidthCm,-screenHeightCm,-2*screenHeightCm);
     glEnd();
@@ -316,8 +316,8 @@ void scene()
 		glColor3f(1.0,1.0,1.0);
 		glNormal3d(0, -1, 0);
 		glTexCoord2f(-5.0,5.0);		glVertex3f( screenWidthCm,screenHeightCm,-2*screenHeightCm); 
-		glTexCoord2f(5.0,5.0);		glVertex3f( screenWidthCm,screenHeightCm, 2*screenHeightCm);  
-		glTexCoord2f(5.0,-5.0);		glVertex3f(-screenWidthCm,screenHeightCm, 2*screenHeightCm);
+		glTexCoord2f(5.0,5.0);		glVertex3f( screenWidthCm,screenHeightCm, screenHeightCm);  
+		glTexCoord2f(5.0,-5.0);		glVertex3f(-screenWidthCm,screenHeightCm, screenHeightCm);
 		glTexCoord2f(-5.0,-5.0);	glVertex3f(-screenWidthCm,screenHeightCm,-2*screenHeightCm);
     glEnd();
 	glBegin(GL_QUADS); //Back
@@ -518,15 +518,19 @@ void display()
 	
 	//Improved Version (WIP)
 	//No Depth
-	glFrustum((-screenWidthCm - worldHeadLoc[X]/1), (screenWidthCm - worldHeadLoc[X]/1), (-screenHeightCm - worldHeadLoc[Y]/1), (screenHeightCm - worldHeadLoc[Y]/1),  .1+ofTesting, 200000.0);
-    gluLookAt(worldHeadLoc[X], worldHeadLoc[Y], 0, worldHeadLoc[X], worldHeadLoc[Y], -1, 0, 1, 0);
+	float nearPlane = .1+ofTesting;
+	
+	glFrustum(nearPlane*(-screenWidthCm - worldHeadLoc[X]/1)/worldHeadLoc[Z], nearPlane*(screenWidthCm - worldHeadLoc[X]/1)/worldHeadLoc[Z], nearPlane*(-screenHeightCm - worldHeadLoc[Y]/1)/worldHeadLoc[Z], nearPlane*(screenHeightCm - worldHeadLoc[Y]/1)/worldHeadLoc[Z], nearPlane, 200000.0);
+	
+	//glFrustum((-screenWidthCm - worldHeadLoc[X]/1), (screenWidthCm - worldHeadLoc[X]/1), (-screenHeightCm - worldHeadLoc[Y]/1), (screenHeightCm - worldHeadLoc[Y]/1), nearPlane, 200000.0);
+    gluLookAt(worldHeadLoc[X], worldHeadLoc[Y], worldHeadLoc[Z], worldHeadLoc[X], worldHeadLoc[Y], 0, 0, 1, 0);
      
 
 	
 	// Translations
 	glTranslatef (xpos, ypos, zpos);
 	
-	// Rotations74777777777777777777777777wwwwwwwwwwwwssssssssssssssssssssssssddasdwasdd774747474744474777777444wasdawsd
+	// Rotations
 	glRotatef (zrot, 0,0,1);        
 	glRotatef (yrot, 0,1,0);
 	glRotatef (xrot, 1,0,0);
