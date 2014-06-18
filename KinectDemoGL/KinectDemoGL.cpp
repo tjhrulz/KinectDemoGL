@@ -199,6 +199,218 @@ void initTexturesBmp(string baseFileName)
 	textureToLoad = 0;
 }
 
+float* faces_Triangles;
+float* faces_Quads;
+float* vertex_Buffer;
+float* normals;
+ 
+int totalConnectedTriangles;	
+int totalConnectedQuads;	
+int totalConnectedPoints;
+int totalFaces;
+
+
+float* calculateNormal( float *coord1, float *coord2, float *coord3 )
+{
+   /* calculate Vector1 and Vector2 */
+   float va[3], vb[3], vr[3], val;
+   va[0] = coord1[0] - coord2[0];
+   va[1] = coord1[1] - coord2[1];
+   va[2] = coord1[2] - coord2[2];
+ 
+   vb[0] = coord1[0] - coord3[0];
+   vb[1] = coord1[1] - coord3[1];
+   vb[2] = coord1[2] - coord3[2];
+ 
+   /* cross product */
+   vr[0] = va[1] * vb[2] - vb[1] * va[2];
+   vr[1] = vb[0] * va[2] - va[0] * vb[2];
+   vr[2] = va[0] * vb[1] - vb[0] * va[1];
+ 
+   /* normalization factor */
+   val = sqrt( vr[0]*vr[0] + vr[1]*vr[1] + vr[2]*vr[2] );
+ 
+	float norm[3];
+	norm[0] = vr[0]/val;
+	norm[1] = vr[1]/val;
+	norm[2] = vr[2]/val;
+ 
+ 
+	return norm;
+}
+
+void initMesh(char* filename, float meshScale)
+{
+    totalConnectedTriangles = 0; 
+	totalConnectedQuads = 0;
+	totalConnectedPoints = 0;
+ 
+    char* pch = strstr(filename,".ply");
+ 
+    if (pch != NULL)
+    {
+	   FILE* file = fopen(filename,"r");
+ 
+		fseek(file,0,SEEK_END);
+		long fileSize = ftell(file);
+ 
+
+		vertex_Buffer = (float*) malloc (ftell(file));
+
+		fseek(file,0,SEEK_SET); 
+ 
+	   faces_Triangles = (float*) malloc(fileSize*sizeof(float));
+	   normals  = (float*) malloc(fileSize*sizeof(float));
+ 
+       if (file)
+       {
+			int i = 0;   
+			int temp = 0;
+			int quads_index = 0;
+            int triangle_index = 0;
+			int normal_index = 0;
+			char buffer[1000];
+ 
+ 
+			fgets(buffer,300,file);			// ply
+ 
+ 
+			// READ HEADER
+			// -----------------
+ 
+			// Find number of vertexes
+			while (  strncmp( "element vertex", buffer,strlen("element vertex")) != 0  )
+			{
+				fgets(buffer,300,file);			// format
+			}
+			strcpy(buffer, buffer+strlen("element vertex"));
+			sscanf(buffer,"%i", &totalConnectedPoints);
+ 
+ 
+			// Find number of vertexes
+			fseek(file,0,SEEK_SET);
+			while (  strncmp( "element face", buffer,strlen("element face")) != 0  )
+			{
+				fgets(buffer,300,file);			// format
+			}
+			strcpy(buffer, buffer+strlen("element face"));
+			sscanf(buffer,"%i", &totalFaces);
+ 
+ 
+			// go to end_header
+			while (  strncmp( "end_header", buffer,strlen("end_header")) != 0  )
+			{
+				fgets(buffer,300,file);			// format
+			}
+ 
+			//----------------------
+ 
+ 
+			// read verteces
+			i =0;
+			for (int iterator = 0; iterator < totalConnectedPoints; iterator++)
+			{
+				fgets(buffer,300,file);
+ 
+				sscanf(buffer,"%f %f %f", &vertex_Buffer[i], &vertex_Buffer[i+1], &vertex_Buffer[i+2]);
+				i += 3;
+			}
+ 
+			// read faces
+			i =0;
+			for (int iterator = 0; iterator < totalFaces; iterator++)
+			{
+				fgets(buffer,300,file);
+ 
+					if (buffer[0] == '3')
+					{
+ 
+						int vertex1 = 0, vertex2 = 0, vertex3 = 0;
+						//sscanf(buffer,"%i%i%i\n", vertex1,vertex2,vertex3 );
+						buffer[0] = ' ';
+						sscanf(buffer,"%i%i%i", &vertex1,&vertex2,&vertex3 );
+						/*vertex1 -= 1;
+						vertex2 -= 1;
+						vertex3 -= 1;
+*/
+						//  vertex == punt van vertex lijst
+						// vertex_buffer -> xyz xyz xyz xyz
+						//printf("%f %f %f ", Vertex_Buffer[3*vertex1], Vertex_Buffer[3*vertex1+1], Vertex_Buffer[3*vertex1+2]);
+ 
+						faces_Triangles[triangle_index]   = vertex_Buffer[3*vertex1]*meshScale;
+						faces_Triangles[triangle_index+1] = vertex_Buffer[3*vertex1+1]*meshScale;
+						faces_Triangles[triangle_index+2] = vertex_Buffer[3*vertex1+2]*meshScale;
+						faces_Triangles[triangle_index+3] = vertex_Buffer[3*vertex2]*meshScale;
+						faces_Triangles[triangle_index+4] = vertex_Buffer[3*vertex2+1]*meshScale;
+						faces_Triangles[triangle_index+5] = vertex_Buffer[3*vertex2+2]*meshScale;
+						faces_Triangles[triangle_index+6] = vertex_Buffer[3*vertex3]*meshScale;
+						faces_Triangles[triangle_index+7] = vertex_Buffer[3*vertex3+1]*meshScale;
+						faces_Triangles[triangle_index+8] = vertex_Buffer[3*vertex3+2]*meshScale;
+ 
+						float coord1[3] = {faces_Triangles[triangle_index],   faces_Triangles[triangle_index+1], faces_Triangles[triangle_index+2]};
+						float coord2[3] = {faces_Triangles[triangle_index+3], faces_Triangles[triangle_index+4], faces_Triangles[triangle_index+5]};
+						float coord3[3] = {faces_Triangles[triangle_index+6], faces_Triangles[triangle_index+7], faces_Triangles[triangle_index+8]};
+						float *norm = calculateNormal(coord1, coord2, coord3);
+ 
+						normals[normal_index] = norm[0];
+						normals[normal_index+1] = norm[1];
+						normals[normal_index+2] = norm[2];
+						normals[normal_index+3] = norm[0];
+						normals[normal_index+4] = norm[1];
+						normals[normal_index+5] = norm[2];
+						normals[normal_index+6] = norm[0];
+						normals[normal_index+7] = norm[1];
+						normals[normal_index+8] = norm[2];
+ 
+						normal_index += 9;
+ 
+						triangle_index += 9;
+						totalConnectedTriangles += 3;
+					}
+ 
+ 
+					i += 3;
+			}
+ 
+ 
+			fclose(file);
+		}
+ 
+      else { printf("File can't be opened\n"); }
+    } else {
+      printf("File does not have a .PLY extension. ");    
+    }   
+}
+
+ 
+void drawMesh()
+{
+	glEnable(GL_LIGHTING);
+    glEnable(GL_LIGHT0);
+
+	// Set lighting intensity
+
+
+	glLightfv(GL_LIGHT0, GL_AMBIENT, ambientLight);
+    glLightfv(GL_LIGHT0, GL_DIFFUSE, diffuseLight);
+    glLightfv(GL_LIGHT0, GL_SPECULAR, specularLight);
+    
+    // Set the light position
+    glLightfv(GL_LIGHT0, GL_POSITION, lightPosition);
+
+	glMaterialfv(GL_FRONT_AND_BACK, GL_AMBIENT, orange);
+	glMaterialfv(GL_FRONT_AND_BACK, GL_DIFFUSE, orange);
+	glColor3f(1.0,1.0,1.0);
+	glEnableClientState(GL_VERTEX_ARRAY);	
+ 	glEnableClientState(GL_NORMAL_ARRAY);
+	glVertexPointer(3,GL_FLOAT,	0,faces_Triangles);	
+	glNormalPointer(GL_FLOAT, 0, normals);
+	glDrawArrays(GL_TRIANGLES, 0, totalConnectedTriangles);	
+	glDisableClientState(GL_VERTEX_ARRAY);    
+	glDisableClientState(GL_NORMAL_ARRAY);
+	glDisable(GL_LIGHT0);
+	glDisable(GL_LIGHTING);
+}
 
 
 void spheres()
@@ -505,26 +717,23 @@ void display()
 
 	glPushMatrix();
 		//Draw Scene
-		spheres();
-		scene();	
+		//spheres();
+		//scene();	
 	glPopMatrix();
+	drawMesh();
 
 	glMatrixMode(GL_PROJECTION);
 	glLoadIdentity();
 
 	//Functional
-	//glFrustum((-1 * pixelRatio - worldHeadLoc[X]/1000), (1 * pixelRatio - worldHeadLoc[X]/1000), (-1.0 - worldHeadLoc[Y]/1000), (1.0 - worldHeadLoc[Y]/1000),  3 + worldHeadLoc[Z]/1000, 200000.0);
-	//gluLookAt(xpos + worldHeadLoc[X]*1, ypos + worldHeadLoc[Y]*1, zpos + worldHeadLoc[Z]*1, 0, 0, 0, 0, 1, 0);
-	
-	//Improved Version (WIP)
-	//No Depth
 	float nearPlane = .1+ofTesting;
 	
-	glFrustum(nearPlane*(-screenWidthCm - worldHeadLoc[X]/1)/worldHeadLoc[Z], nearPlane*(screenWidthCm - worldHeadLoc[X]/1)/worldHeadLoc[Z], nearPlane*(-screenHeightCm - worldHeadLoc[Y]/1)/worldHeadLoc[Z], nearPlane*(screenHeightCm - worldHeadLoc[Y]/1)/worldHeadLoc[Z], nearPlane, 200000.0);
+	//Enable these two sets to get 1D tracking, just set to near expected or average values
+	//worldHeadLoc[Y] = 38;
+	//worldHeadLoc[Z] = 243;
 	
-	//glFrustum((-screenWidthCm - worldHeadLoc[X]/1), (screenWidthCm - worldHeadLoc[X]/1), (-screenHeightCm - worldHeadLoc[Y]/1), (screenHeightCm - worldHeadLoc[Y]/1), nearPlane, 200000.0);
-    gluLookAt(worldHeadLoc[X], worldHeadLoc[Y], worldHeadLoc[Z], worldHeadLoc[X], worldHeadLoc[Y], 0, 0, 1, 0);
-     
+	glFrustum(nearPlane*(-screenWidthCm - worldHeadLoc[X]/1)/worldHeadLoc[Z], nearPlane*(screenWidthCm - worldHeadLoc[X]/1)/worldHeadLoc[Z], nearPlane*(-screenHeightCm - worldHeadLoc[Y]/1)/worldHeadLoc[Z], nearPlane*(screenHeightCm - worldHeadLoc[Y]/1)/worldHeadLoc[Z], nearPlane, 200000.0);
+	gluLookAt(worldHeadLoc[X], worldHeadLoc[Y], worldHeadLoc[Z], worldHeadLoc[X], worldHeadLoc[Y], 0, 0, 1, 0);
 
 	
 	// Translations
@@ -604,8 +813,9 @@ int main(int argc, char** argv)
 	init();
 
 	initTexturesBmp("textures\\bay\\bayScene");
-	//initTexturesBmp("checkerboard");
-	
+	initMesh("thai.ply", .15);
+
+
 	//updatePosition(1);
 	glutMainLoop();   
 }
