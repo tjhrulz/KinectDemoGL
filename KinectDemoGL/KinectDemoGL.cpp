@@ -26,20 +26,20 @@ using namespace std;
 const int BLURFREQUENCY = 0;
 const int TEXTURECOUNT = 1;
 const double PI = 3.14159265358979323846;
-const float screenWidthCm = 142.3/2;
-const float screenHeightCm = 80.5/2;
-const float kinectOffsetCm[3] = {0,-40,0};
-const int BMPHEADERSIZE = 54;
-
-const int X = 0;
-const int Y = 1;
-const int Z = 2;
 //Collab 4K tv 142.3 cm Width 80.5 Height
 //Collab Resolution 3840 x 2160
 
 //Laptop 34.5 cm Width 19.5 Height
 //Laptop Resolution 1920 x 1080
 //In centimeters
+const float screenWidthCm = 142.3/2;
+const float screenHeightCm = 80.5/2;
+const float kinectOffsetCm[3] = {0,50,0};
+const int BMPHEADERSIZE = 54;
+
+const int X = 0;
+const int Y = 1;
+const int Z = 2;
 
 
 // Camera Postition Vars
@@ -53,7 +53,8 @@ float zrot = 0.0;
 
 float worldHeadLoc[3];
 
-//Textures and Normals Vars
+
+//Texture Importer Vars
 int textureWidth[TEXTURECOUNT];
 int textureHeight[TEXTURECOUNT];
 char * textureData[TEXTURECOUNT];
@@ -61,8 +62,21 @@ GLuint textureID[TEXTURECOUNT];
 int textureToLoad = 0;
 int blendsTillTexture = 0;
 
+
+//Mesh Importer Vars
+float* faces_Triangles;
+float* faces_Quads;
+float* vertex_Buffer;
+float* normals;
+ 
+int totalConnectedTriangles;	
+int totalConnectedQuads;	
+int totalConnectedPoints;
+int totalFaces;
+
+
 //Lighting Vars
-GLfloat lightPosition[]    = {screenWidthCm, screenHeightCm, 50, 0.0};
+GLfloat lightPosition[]    = {0, screenHeightCm, 0, 0.0};
 
 GLfloat green[] = {0.0, 1.0, 0.0, 1.0}; //Green Color
 GLfloat blue[] = {0.0, 0.0, 1.0, 1.0}; //Blue Color
@@ -83,26 +97,25 @@ GLfloat specularLight[]    = {1.0, 1.0, 1.0, 1.0};
 HANDLE depthStream;
 INuiSensor* sensor;
 Vector4 skeletonPosition[NUI_SKELETON_POSITION_COUNT];
+
+
 //Generic Vars
 bool infoToggle = false;
-
-
-//Collab 4K tv 142.3 cm Width 80.5 Height
-//Collab Resolution 3840 x 2160
-//Laptop 34.5 cm Width 19.5 Height
-//Laptop Resolution 1920 x 1080
-//In centimeters
+bool yzTracking = false;
+//Window Vars
 int pixelWidth;
 int pixelHeight;
 float pixelRatio;
-
+//FPS Vars
+int frameCount = 0;
+int fps = 0;
+float currentTime = 0.0;
+float previousTime = 0.0;
+//Debug Vars
 float ofTesting = 0;
 float ofTesting1 = 0;
 float ofTesting2 = 0;
-float ofTesting3 = 0;
-float ofTesting4 = 0;
 
-//Clean up kinect code some uneeded stuff in here
 bool initKinect() 
 {
     // Get a working kinect sensor
@@ -124,7 +137,7 @@ bool initKinect()
 
 void getSkeletalData() 
 {	
-	if(sensor)
+ 	if(sensor)
 	{
 		NUI_SKELETON_FRAME skeletonFrame = {0};
 		if (sensor->NuiSkeletonGetNextFrame(0, &skeletonFrame) >= 0) 
@@ -143,7 +156,7 @@ void getSkeletalData()
 					{
 						skeletonPosition[NUI_SKELETON_POSITION_HEAD].w = 0;
 					}
-					glutPostRedisplay();
+					//glutPostRedisplay();
 					return; // Only take the data for one skeleton
 				}
 			}
@@ -199,17 +212,6 @@ void initTexturesBmp(string baseFileName)
 	textureToLoad = 0;
 }
 
-float* faces_Triangles;
-float* faces_Quads;
-float* vertex_Buffer;
-float* normals;
- 
-int totalConnectedTriangles;	
-int totalConnectedQuads;	
-int totalConnectedPoints;
-int totalFaces;
-
-
 float* calculateNormal( float *coord1, float *coord2, float *coord3 )
 {
    /* calculate Vector1 and Vector2 */
@@ -241,16 +243,20 @@ float* calculateNormal( float *coord1, float *coord2, float *coord3 )
 
 void initMesh(char* filename, float meshScale)
 {
-    totalConnectedTriangles = 0; 
+	totalConnectedTriangles = 0; 
 	totalConnectedQuads = 0;
 	totalConnectedPoints = 0;
  
-    char* pch = strstr(filename,".ply");
+
+	FILE* file = fopen(filename,"r");
  
-    if (pch != NULL)
-    {
-	   FILE* file = fopen(filename,"r");
- 
+	if (!file)
+	{
+			//File could not be found
+			cout << "Mesh could not be found/opened" << endl;
+			system("pause");
+			exit(0);
+	}
 		fseek(file,0,SEEK_END);
 		long fileSize = ftell(file);
  
@@ -259,127 +265,120 @@ void initMesh(char* filename, float meshScale)
 
 		fseek(file,0,SEEK_SET); 
  
-	   faces_Triangles = (float*) malloc(fileSize*sizeof(float));
-	   normals  = (float*) malloc(fileSize*sizeof(float));
+		faces_Triangles = (float*) malloc(fileSize*sizeof(float));
+		normals  = (float*) malloc(fileSize*sizeof(float));
  
-       if (file)
-       {
-			int i = 0;   
-			int temp = 0;
-			int quads_index = 0;
-            int triangle_index = 0;
-			int normal_index = 0;
-			char buffer[1000];
- 
- 
-			fgets(buffer,300,file);			// ply
+
+		int i = 0;   
+		int temp = 0;
+		int quads_index = 0;
+		int triangle_index = 0;
+		int normal_index = 0;
+		char buffer[1000];
  
  
-			// READ HEADER
-			// -----------------
- 
-			// Find number of vertexes
-			while (  strncmp( "element vertex", buffer,strlen("element vertex")) != 0  )
-			{
-				fgets(buffer,300,file);			// format
-			}
-			strcpy(buffer, buffer+strlen("element vertex"));
-			sscanf(buffer,"%i", &totalConnectedPoints);
+		fgets(buffer,300,file);			// ply
  
  
-			// Find number of vertexes
-			fseek(file,0,SEEK_SET);
-			while (  strncmp( "element face", buffer,strlen("element face")) != 0  )
-			{
-				fgets(buffer,300,file);			// format
-			}
-			strcpy(buffer, buffer+strlen("element face"));
-			sscanf(buffer,"%i", &totalFaces);
+		// READ HEADER
+		// -----------------
+ 
+		// Find number of vertexes
+		while (  strncmp( "element vertex", buffer,strlen("element vertex")) != 0  )
+		{
+		fgets(buffer,300,file);			// format
+		}
+		strcpy(buffer, buffer+strlen("element vertex"));
+		sscanf(buffer,"%i", &totalConnectedPoints);
  
  
-			// go to end_header
-			while (  strncmp( "end_header", buffer,strlen("end_header")) != 0  )
-			{
-				fgets(buffer,300,file);			// format
-			}
- 
-			//----------------------
- 
- 
-			// read verteces
-			i =0;
-			for (int iterator = 0; iterator < totalConnectedPoints; iterator++)
-			{
-				fgets(buffer,300,file);
- 
-				sscanf(buffer,"%f %f %f", &vertex_Buffer[i], &vertex_Buffer[i+1], &vertex_Buffer[i+2]);
-				i += 3;
-			}
- 
-			// read faces
-			i =0;
-			for (int iterator = 0; iterator < totalFaces; iterator++)
-			{
-				fgets(buffer,300,file);
- 
-					if (buffer[0] == '3')
-					{
- 
-						int vertex1 = 0, vertex2 = 0, vertex3 = 0;
-						//sscanf(buffer,"%i%i%i\n", vertex1,vertex2,vertex3 );
-						buffer[0] = ' ';
-						sscanf(buffer,"%i%i%i", &vertex1,&vertex2,&vertex3 );
-						/*vertex1 -= 1;
-						vertex2 -= 1;
-						vertex3 -= 1;
-*/
-						//  vertex == punt van vertex lijst
-						// vertex_buffer -> xyz xyz xyz xyz
-						//printf("%f %f %f ", Vertex_Buffer[3*vertex1], Vertex_Buffer[3*vertex1+1], Vertex_Buffer[3*vertex1+2]);
- 
-						faces_Triangles[triangle_index]   = vertex_Buffer[3*vertex1]*meshScale;
-						faces_Triangles[triangle_index+1] = vertex_Buffer[3*vertex1+1]*meshScale;
-						faces_Triangles[triangle_index+2] = vertex_Buffer[3*vertex1+2]*meshScale;
-						faces_Triangles[triangle_index+3] = vertex_Buffer[3*vertex2]*meshScale;
-						faces_Triangles[triangle_index+4] = vertex_Buffer[3*vertex2+1]*meshScale;
-						faces_Triangles[triangle_index+5] = vertex_Buffer[3*vertex2+2]*meshScale;
-						faces_Triangles[triangle_index+6] = vertex_Buffer[3*vertex3]*meshScale;
-						faces_Triangles[triangle_index+7] = vertex_Buffer[3*vertex3+1]*meshScale;
-						faces_Triangles[triangle_index+8] = vertex_Buffer[3*vertex3+2]*meshScale;
- 
-						float coord1[3] = {faces_Triangles[triangle_index],   faces_Triangles[triangle_index+1], faces_Triangles[triangle_index+2]};
-						float coord2[3] = {faces_Triangles[triangle_index+3], faces_Triangles[triangle_index+4], faces_Triangles[triangle_index+5]};
-						float coord3[3] = {faces_Triangles[triangle_index+6], faces_Triangles[triangle_index+7], faces_Triangles[triangle_index+8]};
-						float *norm = calculateNormal(coord1, coord2, coord3);
- 
-						normals[normal_index] = norm[0];
-						normals[normal_index+1] = norm[1];
-						normals[normal_index+2] = norm[2];
-						normals[normal_index+3] = norm[0];
-						normals[normal_index+4] = norm[1];
-						normals[normal_index+5] = norm[2];
-						normals[normal_index+6] = norm[0];
-						normals[normal_index+7] = norm[1];
-						normals[normal_index+8] = norm[2];
- 
-						normal_index += 9;
- 
-						triangle_index += 9;
-						totalConnectedTriangles += 3;
-					}
+		// Find number of vertexes
+		fseek(file,0,SEEK_SET);
+		while (  strncmp( "element face", buffer,strlen("element face")) != 0  )
+		{
+		fgets(buffer,300,file);			// format
+		}
+		strcpy(buffer, buffer+strlen("element face"));
+		sscanf(buffer,"%i", &totalFaces);
  
  
-					i += 3;
-			}
- 
- 
-			fclose(file);
+		// go to end_header
+		while (  strncmp( "end_header", buffer,strlen("end_header")) != 0  )
+		{
+		fgets(buffer,300,file);			// format
 		}
  
-      else { printf("File can't be opened\n"); }
-    } else {
-      printf("File does not have a .PLY extension. ");    
-    }   
+		//----------------------
+ 
+ 
+		// read verteces
+		i =0;
+		for (int iterator = 0; iterator < totalConnectedPoints; iterator++)
+		{
+		fgets(buffer,300,file);
+ 
+		sscanf(buffer,"%f %f %f", &vertex_Buffer[i], &vertex_Buffer[i+1], &vertex_Buffer[i+2]);
+		i += 3;
+		}
+ 
+		// read faces
+		i =0;
+		for (int iterator = 0; iterator < totalFaces; iterator++)
+		{
+		fgets(buffer,300,file);
+ 
+		if (buffer[0] == '3')
+		{
+ 
+		int vertex1 = 0, vertex2 = 0, vertex3 = 0;
+		//sscanf(buffer,"%i%i%i\n", vertex1,vertex2,vertex3 );
+		buffer[0] = ' ';
+		sscanf(buffer,"%i%i%i", &vertex1,&vertex2,&vertex3 );
+		/*vertex1 -= 1;
+		vertex2 -= 1;
+		vertex3 -= 1;
+		*/
+		//  vertex == punt van vertex lijst
+		// vertex_buffer -> xyz xyz xyz xyz
+		//printf("%f %f %f ", Vertex_Buffer[3*vertex1], Vertex_Buffer[3*vertex1+1], Vertex_Buffer[3*vertex1+2]);
+ 
+		faces_Triangles[triangle_index]   = vertex_Buffer[3*vertex1]*meshScale;
+		faces_Triangles[triangle_index+1] = vertex_Buffer[3*vertex1+1]*meshScale;
+		faces_Triangles[triangle_index+2] = vertex_Buffer[3*vertex1+2]*meshScale;
+		faces_Triangles[triangle_index+3] = vertex_Buffer[3*vertex2]*meshScale;
+		faces_Triangles[triangle_index+4] = vertex_Buffer[3*vertex2+1]*meshScale;
+		faces_Triangles[triangle_index+5] = vertex_Buffer[3*vertex2+2]*meshScale;
+		faces_Triangles[triangle_index+6] = vertex_Buffer[3*vertex3]*meshScale;
+		faces_Triangles[triangle_index+7] = vertex_Buffer[3*vertex3+1]*meshScale;
+		faces_Triangles[triangle_index+8] = vertex_Buffer[3*vertex3+2]*meshScale;
+ 
+		float coord1[3] = {faces_Triangles[triangle_index],   faces_Triangles[triangle_index+1], faces_Triangles[triangle_index+2]};
+		float coord2[3] = {faces_Triangles[triangle_index+3], faces_Triangles[triangle_index+4], faces_Triangles[triangle_index+5]};
+		float coord3[3] = {faces_Triangles[triangle_index+6], faces_Triangles[triangle_index+7], faces_Triangles[triangle_index+8]};
+		float *norm = calculateNormal(coord1, coord2, coord3);
+ 
+		normals[normal_index] = norm[0];
+		normals[normal_index+1] = norm[1];
+		normals[normal_index+2] = norm[2];
+		normals[normal_index+3] = norm[0];
+		normals[normal_index+4] = norm[1];
+		normals[normal_index+5] = norm[2];
+		normals[normal_index+6] = norm[0];
+		normals[normal_index+7] = norm[1];
+		normals[normal_index+8] = norm[2];
+ 
+		normal_index += 9;
+ 
+		triangle_index += 9;
+		totalConnectedTriangles += 3;
+		}
+ 
+ 
+		i += 3;
+		}
+ 
+ 
+		fclose(file);
 }
 
  
@@ -583,6 +582,31 @@ void scene()
 	glDisable(GL_BLEND);
 }
 
+void calculateFPS()
+{
+    //  Increase frame count
+    frameCount++;
+ 
+    //  Get the number of milliseconds since glutInit called
+    //  (or first call to glutGet(GLUT ELAPSED TIME)).
+    currentTime = glutGet(GLUT_ELAPSED_TIME);
+ 
+    //  Calculate time passed
+    int timeInterval = currentTime - previousTime;
+ 
+    if(timeInterval > 1000)
+    {
+        //  calculate the number of frames per second
+        fps = frameCount / (timeInterval / 1000.0f);
+ 
+        //  Set time
+        previousTime = currentTime;
+ 
+        //  Reset frame count
+        frameCount = 0;
+    }
+}
+
 void keyboard (unsigned char key, int x, int y) {
  
 	switch (key) {
@@ -631,6 +655,9 @@ void keyboard (unsigned char key, int x, int y) {
 			break;
 		case 'r':
 			glutPostRedisplay();
+			break;
+		case 't':
+			yzTracking != yzTracking;
 			break;
 		case 'W': 
 			xrot += 1;
@@ -688,25 +715,28 @@ void keyboard (unsigned char key, int x, int y) {
    }
 }
 
-void updatePosition(int value)
-{
-	glutPostRedisplay();  
-	glutTimerFunc(16, updatePosition, 1);    
-}
-
-
 void display()
 {
+	float nearPlane = .1+ofTesting;
     glClear(GL_COLOR_BUFFER_BIT|GL_DEPTH_BUFFER_BIT);
     glMatrixMode(GL_MODELVIEW);
 	glLoadIdentity();
     
+	if(sensor)
+	{
+		getSkeletalData();
 
-
-	//grab head positions and convert to cm, offset values based on where the kinect is relative to screen
+	//grab head positions and convert to cm, offset values based on where the kinect is relative to screengithub
 	worldHeadLoc[X] = skeletonPosition[NUI_SKELETON_POSITION_HEAD].x * 100 + kinectOffsetCm[X];
 	worldHeadLoc[Y] = skeletonPosition[NUI_SKELETON_POSITION_HEAD].y * 100 + kinectOffsetCm[Y];
 	worldHeadLoc[Z] = skeletonPosition[NUI_SKELETON_POSITION_HEAD].z * 100 + kinectOffsetCm[Z]; 
+	}
+	else
+	{
+	worldHeadLoc[X] = kinectOffsetCm[X];
+	worldHeadLoc[Y] = kinectOffsetCm[Y];
+	worldHeadLoc[Z] = kinectOffsetCm[Z]; 
+	}
 
 	if(infoToggle)
 	{
@@ -721,17 +751,28 @@ void display()
 		//scene();	
 	glPopMatrix();
 	drawMesh();
+	
+	string framerate =  std::to_string(static_cast<long long>(fps));
+
+	glColor3f(1.0, 0.0, 0.0);	
+	glRasterPos3f(screenWidthCm - (screenWidthCm/8),screenHeightCm-(screenHeightCm/8),0);
+	for(int i = 0; i < framerate.length(); i++)
+	{
+
+		glutBitmapCharacter(GLUT_BITMAP_TIMES_ROMAN_24, framerate[i]);
+	}
 
 	glMatrixMode(GL_PROJECTION);
 	glLoadIdentity();
 
 	//Functional
-	float nearPlane = .1+ofTesting;
 	
-	//Enable these two sets to get 1D tracking, just set to near expected or average values
-	//worldHeadLoc[Y] = 38;
-	//worldHeadLoc[Z] = 243;
-	
+	if(!yzTracking)
+	{
+		//Setting these two values gets you 1D tracking, just set to near expected or average values (Likely will make later set to last known/average headLoc[Y] and headLoc[Z]
+		worldHeadLoc[Y] = 38;
+		worldHeadLoc[Z] = 243;
+	}
 	glFrustum(nearPlane*(-screenWidthCm - worldHeadLoc[X]/1)/worldHeadLoc[Z], nearPlane*(screenWidthCm - worldHeadLoc[X]/1)/worldHeadLoc[Z], nearPlane*(-screenHeightCm - worldHeadLoc[Y]/1)/worldHeadLoc[Z], nearPlane*(screenHeightCm - worldHeadLoc[Y]/1)/worldHeadLoc[Z], nearPlane, 200000.0);
 	gluLookAt(worldHeadLoc[X], worldHeadLoc[Y], worldHeadLoc[Z], worldHeadLoc[X], worldHeadLoc[Y], 0, 0, 1, 0);
 
@@ -744,32 +785,8 @@ void display()
 	glRotatef (yrot, 0,1,0);
 	glRotatef (xrot, 1,0,0);
 
-
-	//Only Depth
-	//glFrustum((-screenWidthCm - 0), (screenWidthCm - 0), (-screenHeightCm - 0), (screenHeightCm - 0),  screenHeightCm, 200000.0);
-    //gluLookAt(0, 0, 0, 0, 0, -worldHeadLoc[Z], 0, 1, 0);
-
-	//Half done
-	/*
-	float nearPlane = worldHeadLoc[Z]/200;
-	float farPlane = 100000.0;
-	float fov = tan( 30 * PI / 360);
-	worldHeadLoc[X] = -worldHeadLoc[X]/(screenWidthCm/2) * .5;
-	worldHeadLoc[Y] = -worldHeadLoc[Y]/(screenHeightCm/2) *.25;
-
-
-    glFrustum(nearPlane * (-fov * pixelRatio + worldHeadLoc[X]),  nearPlane * (fov * pixelRatio + worldHeadLoc[X]), nearPlane * (-fov + worldHeadLoc[Y]), nearPlane * (fov + worldHeadLoc[Y]),  nearPlane, farPlane);
-     
-
-    float dis = -screenHeightCm;
-    gluLookAt( worldHeadLoc[X] * dis, worldHeadLoc[Y] * dis, 0, worldHeadLoc[X] * dis, worldHeadLoc[Y] * dis, -1, 0, 1, 0);
-
-	glMatrixMode(GL_MODELVIEW);
-	glLoadIdentity();
-    glTranslatef( 0.0, 0.0, dis);
-	*/
 	glutSwapBuffers();
-    
+    calculateFPS();
 }
 
 // reshapes window, gives the actual size of the xzy coordinate units
@@ -806,16 +823,14 @@ int main(int argc, char** argv)
 	glutInitWindowPosition(0, 0);
 	glutCreateWindow("Kinect Headtracking OpenGL");
 	glutDisplayFunc(display);
-	glutIdleFunc(getSkeletalData);
+	glutIdleFunc(display); //To limit to whenever kinect is ready set to getSkeletonData
 	glutReshapeFunc(reshape);
 	glutKeyboardFunc(keyboard);
 	
 	init();
 
 	initTexturesBmp("textures\\bay\\bayScene");
-	initMesh("thai.ply", .15);
+	initMesh("meshes\\xyzrgb_statuette_simpasdflify.ply", .15);
 
-
-	//updatePosition(1);
 	glutMainLoop();   
 }
