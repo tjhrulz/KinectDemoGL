@@ -32,9 +32,9 @@ const double PI = 3.14159265358979323846;
 //Laptop 34.5 cm Width 19.5 Height
 //Laptop Resolution 1920 x 1080
 //In centimeters
-const float screenWidthCm = 142.3/2;
-const float screenHeightCm = 80.5/2;
-const float kinectOffsetCm[3] = {0,50,0};
+const float screenWidthCm = 60.2/2;
+const float screenHeightCm = 34.2/2;
+const float kinectOffsetCm[3] = {0,13,0};
 const int BMPHEADERSIZE = 54;
 
 const int X = 0;
@@ -50,6 +50,8 @@ float zpos = 0.0;
 float xrot = 0.0;
 float yrot = 0.0;
 float zrot = 0.0;
+
+float scale = 1.0;
 
 float worldHeadLoc[3];
 
@@ -102,6 +104,7 @@ Vector4 skeletonPosition[NUI_SKELETON_POSITION_COUNT];
 //Generic Vars
 bool infoToggle = false;
 bool yzTracking = false;
+bool drawCenter = false;
 //Window Vars
 int pixelWidth;
 int pixelHeight;
@@ -111,6 +114,9 @@ int frameCount = 0;
 int fps = 0;
 float currentTime = 0.0;
 float previousTime = 0.0;
+//3D Display Vars
+float eyeDistCm = 3.0;
+bool isRightEye = false;
 //Debug Vars
 float ofTesting = 0;
 float ofTesting1 = 0;
@@ -257,148 +263,151 @@ void initMesh(char* filename, float meshScale)
 			system("pause");
 			exit(0);
 	}
-		fseek(file,0,SEEK_END);
-		long fileSize = ftell(file);
+	fseek(file,0,SEEK_END);
+	long fileSize = ftell(file);
  
 
-		vertex_Buffer = (float*) malloc (ftell(file));
+	vertex_Buffer = (float*) malloc (ftell(file));
 
-		fseek(file,0,SEEK_SET); 
+	fseek(file,0,SEEK_SET); 
  
-		faces_Triangles = (float*) malloc(fileSize*sizeof(float));
-		normals  = (float*) malloc(fileSize*sizeof(float));
+	faces_Triangles = (float*) malloc(fileSize*sizeof(float));
+	normals  = (float*) malloc(fileSize*sizeof(float));
  
 
-		int i = 0;   
-		int temp = 0;
-		int quads_index = 0;
-		int triangle_index = 0;
-		int normal_index = 0;
-		char buffer[1000];
+	int i = 0;   
+	int temp = 0;
+	int quads_index = 0;
+	int triangle_index = 0;
+	int normal_index = 0;
+	char buffer[1000];
  
  
-		fgets(buffer,300,file);			// ply
+	fgets(buffer,300,file);			// ply
  
  
-		// READ HEADER
-		// -----------------
+	// READ HEADER
+	// -----------------
  
-		// Find number of vertexes
-		while (  strncmp( "element vertex", buffer,strlen("element vertex")) != 0  )
-		{
+	// Find number of vertexes
+	while (  strncmp( "element vertex", buffer,strlen("element vertex")) != 0  )
+	{
 		fgets(buffer,300,file);			// format
-		}
-		strcpy(buffer, buffer+strlen("element vertex"));
-		sscanf(buffer,"%i", &totalConnectedPoints);
+	}
+	strcpy(buffer, buffer+strlen("element vertex"));
+	sscanf(buffer,"%i", &totalConnectedPoints);
  
  
-		// Find number of vertexes
-		fseek(file,0,SEEK_SET);
-		while (  strncmp( "element face", buffer,strlen("element face")) != 0  )
-		{
+	// Find number of vertexes
+	fseek(file,0,SEEK_SET);
+	while (  strncmp( "element face", buffer,strlen("element face")) != 0  )
+	{
 		fgets(buffer,300,file);			// format
-		}
-		strcpy(buffer, buffer+strlen("element face"));
-		sscanf(buffer,"%i", &totalFaces);
+	}
+	strcpy(buffer, buffer+strlen("element face"));
+	sscanf(buffer,"%i", &totalFaces);
  
  
-		// go to end_header
-		while (  strncmp( "end_header", buffer,strlen("end_header")) != 0  )
-		{
+	// go to end_header
+	while (  strncmp( "end_header", buffer,strlen("end_header")) != 0  )
+	{
 		fgets(buffer,300,file);			// format
-		}
+	}
  
-		//----------------------
+	//----------------------
  
  
-		// read verteces
-		i =0;
-		for (int iterator = 0; iterator < totalConnectedPoints; iterator++)
-		{
+	// read verteces
+	i =0;
+	for (int iterator = 0; iterator < totalConnectedPoints; iterator++)
+	{
 		fgets(buffer,300,file);
  
 		sscanf(buffer,"%f %f %f", &vertex_Buffer[i], &vertex_Buffer[i+1], &vertex_Buffer[i+2]);
 		i += 3;
-		}
+	}
  
-		// read faces
-		i =0;
-		for (int iterator = 0; iterator < totalFaces; iterator++)
-		{
+	// read faces
+	i =0;
+	for (int iterator = 0; iterator < totalFaces; iterator++)
+	{
 		fgets(buffer,300,file);
  
 		if (buffer[0] == '3')
 		{
  
-		int vertex1 = 0, vertex2 = 0, vertex3 = 0;
-		//sscanf(buffer,"%i%i%i\n", vertex1,vertex2,vertex3 );
-		buffer[0] = ' ';
-		sscanf(buffer,"%i%i%i", &vertex1,&vertex2,&vertex3 );
-		/*vertex1 -= 1;
-		vertex2 -= 1;
-		vertex3 -= 1;
-		*/
-		//  vertex == punt van vertex lijst
-		// vertex_buffer -> xyz xyz xyz xyz
-		//printf("%f %f %f ", Vertex_Buffer[3*vertex1], Vertex_Buffer[3*vertex1+1], Vertex_Buffer[3*vertex1+2]);
+			int vertex1 = 0, vertex2 = 0, vertex3 = 0;
+			//sscanf(buffer,"%i%i%i\n", vertex1,vertex2,vertex3 );
+			buffer[0] = ' ';
+			sscanf(buffer,"%i%i%i", &vertex1,&vertex2,&vertex3 );
+			/*vertex1 -= 1;
+			vertex2 -= 1;
+			vertex3 -= 1;
+			*/
+			//  vertex == punt van vertex lijst
+			// vertex_buffer -> xyz xyz xyz xyz
+			//printf("%f %f %f ", Vertex_Buffer[3*vertex1], Vertex_Buffer[3*vertex1+1], Vertex_Buffer[3*vertex1+2]);
  
-		faces_Triangles[triangle_index]   = vertex_Buffer[3*vertex1]*meshScale;
-		faces_Triangles[triangle_index+1] = vertex_Buffer[3*vertex1+1]*meshScale;
-		faces_Triangles[triangle_index+2] = vertex_Buffer[3*vertex1+2]*meshScale;
-		faces_Triangles[triangle_index+3] = vertex_Buffer[3*vertex2]*meshScale;
-		faces_Triangles[triangle_index+4] = vertex_Buffer[3*vertex2+1]*meshScale;
-		faces_Triangles[triangle_index+5] = vertex_Buffer[3*vertex2+2]*meshScale;
-		faces_Triangles[triangle_index+6] = vertex_Buffer[3*vertex3]*meshScale;
-		faces_Triangles[triangle_index+7] = vertex_Buffer[3*vertex3+1]*meshScale;
-		faces_Triangles[triangle_index+8] = vertex_Buffer[3*vertex3+2]*meshScale;
+			faces_Triangles[triangle_index]   = vertex_Buffer[3*vertex1]*meshScale;
+			faces_Triangles[triangle_index+1] = vertex_Buffer[3*vertex1+1]*meshScale;
+			faces_Triangles[triangle_index+2] = vertex_Buffer[3*vertex1+2]*meshScale+(1.5/meshScale);
+			faces_Triangles[triangle_index+3] = vertex_Buffer[3*vertex2]*meshScale;
+			faces_Triangles[triangle_index+4] = vertex_Buffer[3*vertex2+1]*meshScale;
+			faces_Triangles[triangle_index+5] = vertex_Buffer[3*vertex2+2]*meshScale+(1.5/meshScale);
+			faces_Triangles[triangle_index+6] = vertex_Buffer[3*vertex3]*meshScale;
+			faces_Triangles[triangle_index+7] = vertex_Buffer[3*vertex3+1]*meshScale;
+			faces_Triangles[triangle_index+8] = vertex_Buffer[3*vertex3+2]*meshScale+(1.5/meshScale);
  
-		float coord1[3] = {faces_Triangles[triangle_index],   faces_Triangles[triangle_index+1], faces_Triangles[triangle_index+2]};
-		float coord2[3] = {faces_Triangles[triangle_index+3], faces_Triangles[triangle_index+4], faces_Triangles[triangle_index+5]};
-		float coord3[3] = {faces_Triangles[triangle_index+6], faces_Triangles[triangle_index+7], faces_Triangles[triangle_index+8]};
-		float *norm = calculateNormal(coord1, coord2, coord3);
+			float coord1[3] = {faces_Triangles[triangle_index],	faces_Triangles[triangle_index+1], faces_Triangles[triangle_index+2]};
+			float coord2[3] = {faces_Triangles[triangle_index+3],	faces_Triangles[triangle_index+4], faces_Triangles[triangle_index+5]};
+			float coord3[3] = {faces_Triangles[triangle_index+6],	faces_Triangles[triangle_index+7], faces_Triangles[triangle_index+8]};
+			float *norm = calculateNormal(coord1, coord2, coord3);
  
-		normals[normal_index] = norm[0];
-		normals[normal_index+1] = norm[1];
-		normals[normal_index+2] = norm[2];
-		normals[normal_index+3] = norm[0];
-		normals[normal_index+4] = norm[1];
-		normals[normal_index+5] = norm[2];
-		normals[normal_index+6] = norm[0];
-		normals[normal_index+7] = norm[1];
-		normals[normal_index+8] = norm[2];
+			normals[normal_index] = norm[0];
+			normals[normal_index+1] = norm[1];
+			normals[normal_index+2] = norm[2];
+			normals[normal_index+3] = norm[0];
+			normals[normal_index+4] = norm[1];
+			normals[normal_index+5] = norm[2];
+			normals[normal_index+6] = norm[0];
+			normals[normal_index+7] = norm[1];
+			normals[normal_index+8] = norm[2];
  
-		normal_index += 9;
+			normal_index += 9;
  
-		triangle_index += 9;
-		totalConnectedTriangles += 3;
+			triangle_index += 9;
+			totalConnectedTriangles += 3;
 		}
  
  
 		i += 3;
-		}
- 
- 
-		fclose(file);
+	}
+	fclose(file);
 }
 
  
 void drawMesh()
 {
+				
+	//Mesh Light Test
 	glEnable(GL_LIGHTING);
-    glEnable(GL_LIGHT0);
-
-	// Set lighting intensity
-
-
+	glEnable(GL_LIGHT0);
 	glLightfv(GL_LIGHT0, GL_AMBIENT, ambientLight);
-    glLightfv(GL_LIGHT0, GL_DIFFUSE, diffuseLight);
-    glLightfv(GL_LIGHT0, GL_SPECULAR, specularLight);
-    
-    // Set the light position
-    glLightfv(GL_LIGHT0, GL_POSITION, lightPosition);
+	glLightfv(GL_LIGHT0, GL_DIFFUSE, diffuseLight);
+	glLightfv(GL_LIGHT0, GL_SPECULAR, specularLight);
+	glLightfv(GL_LIGHT0, GL_POSITION, lightPosition);
 
-	glMaterialfv(GL_FRONT_AND_BACK, GL_AMBIENT, orange);
-	glMaterialfv(GL_FRONT_AND_BACK, GL_DIFFUSE, orange);
+	if(isRightEye) //Allow for different collor for each eye for testing
+	{
+		glMaterialfv(GL_FRONT_AND_BACK, GL_AMBIENT, red);
+		glMaterialfv(GL_FRONT_AND_BACK, GL_DIFFUSE, red);
+	}
+	else
+	{
+		glMaterialfv(GL_FRONT_AND_BACK, GL_AMBIENT, red);
+		glMaterialfv(GL_FRONT_AND_BACK, GL_DIFFUSE, red);
+	}
+
 	glColor3f(1.0,1.0,1.0);
 	glEnableClientState(GL_VERTEX_ARRAY);	
  	glEnableClientState(GL_NORMAL_ARRAY);
@@ -409,6 +418,18 @@ void drawMesh()
 	glDisableClientState(GL_NORMAL_ARRAY);
 	glDisable(GL_LIGHT0);
 	glDisable(GL_LIGHTING);
+
+	if(drawCenter)
+	{
+		//Test cylinder to show center of "rotation" during headtracking
+		glPushMatrix();
+			glRotatef(-90,1,0,0);
+			glTranslatef(0, 0, -50);
+			glColor3f(0.0,0.0,0.0);
+			GLUquadricObj *quadObj = gluNewQuadric();
+			gluCylinder(quadObj, 1, 1, 4000, 100, 100);
+		glPopMatrix();
+	}
 }
 
 
@@ -657,7 +678,10 @@ void keyboard (unsigned char key, int x, int y) {
 			glutPostRedisplay();
 			break;
 		case 't':
-			yzTracking != yzTracking;
+			yzTracking = !yzTracking;
+			break;
+		case 'c':
+			drawCenter = !drawCenter;
 			break;
 		case 'W': 
 			xrot += 1;
@@ -700,12 +724,18 @@ void keyboard (unsigned char key, int x, int y) {
 			glutPostRedisplay();
 			break;
 		case '9': 
-			ofTesting2 += 10;
+			eyeDistCm += .5;
 			glutPostRedisplay();
 			break;
 		case '6': 
-			ofTesting2 -= 10;
+			eyeDistCm -= .5;
 			glutPostRedisplay();
+			break;
+		case '+':
+			scale *=2;
+			break;
+		case '-':
+			scale /=2;
 			break;
 		case ' ':
 			glutFullScreen();
@@ -720,71 +750,94 @@ void display()
 	float nearPlane = .1+ofTesting;
     glClear(GL_COLOR_BUFFER_BIT|GL_DEPTH_BUFFER_BIT);
     glMatrixMode(GL_MODELVIEW);
-	glLoadIdentity();
-    
-	if(sensor)
+	glLoadIdentity();   
+	for(int i = 0; i < 2; i++)
 	{
-		getSkeletalData();
+		if(sensor)
+		{
+			getSkeletalData();
 
-	//grab head positions and convert to cm, offset values based on where the kinect is relative to screengithub
-	worldHeadLoc[X] = skeletonPosition[NUI_SKELETON_POSITION_HEAD].x * 100 + kinectOffsetCm[X];
-	worldHeadLoc[Y] = skeletonPosition[NUI_SKELETON_POSITION_HEAD].y * 100 + kinectOffsetCm[Y];
-	worldHeadLoc[Z] = skeletonPosition[NUI_SKELETON_POSITION_HEAD].z * 100 + kinectOffsetCm[Z]; 
+			//grab head positions and convert to cm, offset values based on where the kinect is relative to screengithub
+			worldHeadLoc[X] = skeletonPosition[NUI_SKELETON_POSITION_HEAD].x * 100 + kinectOffsetCm[X];
+			worldHeadLoc[Y] = skeletonPosition[NUI_SKELETON_POSITION_HEAD].y * 100 + kinectOffsetCm[Y];
+			worldHeadLoc[Z] = skeletonPosition[NUI_SKELETON_POSITION_HEAD].z * 100 + kinectOffsetCm[Z]; 
+		}
+		else
+		{
+			worldHeadLoc[X] = kinectOffsetCm[X];
+			worldHeadLoc[Y] = kinectOffsetCm[Y];
+			worldHeadLoc[Z] = kinectOffsetCm[Z]; 
+		}
+
+		if(infoToggle)
+		{
+			cout << worldHeadLoc[X] << "      " << worldHeadLoc[Y] << "      " << worldHeadLoc[Z] << endl;
+	
+		}
+	
+
+		if(isRightEye) //Draw Which Eye
+		{
+			glDrawBuffer(GL_BACK_LEFT);
+		    glClear(GL_COLOR_BUFFER_BIT|GL_DEPTH_BUFFER_BIT);
+		}
+		else //Draw Right Eye
+		{
+			glDrawBuffer(GL_BACK_RIGHT);
+			glClear(GL_COLOR_BUFFER_BIT|GL_DEPTH_BUFFER_BIT);
+		}
+			glPushMatrix();
+				//Draw Scene
+				//spheres();
+				//scene();	
+				drawMesh();
+			glPopMatrix();
+
+
+		
+			string framerate =  std::to_string(static_cast<long long>(fps));
+
+			glColor3f(1.0, 0.0, 0.0);	
+			glRasterPos3f(screenWidthCm - (screenWidthCm/8),screenHeightCm-(screenHeightCm/8),0);
+			for(int i = 0; i < framerate.length(); i++)
+			{
+
+				glutBitmapCharacter(GLUT_BITMAP_TIMES_ROMAN_24, framerate[i]);
+			}
+
+			glMatrixMode(GL_PROJECTION);
+			glLoadIdentity();
+
+			//Functional
+			if(isRightEye)
+			{
+				worldHeadLoc[X] += eyeDistCm;
+			}
+			else
+			{
+				worldHeadLoc[X] -= eyeDistCm;
+			}
+			if(!yzTracking)
+			{
+				//Setting these two values gets you 1D tracking, just set to near expected or average values (Likely will make later set to last known/average headLoc[Y] and headLoc[Z]
+				worldHeadLoc[Y] = 38;
+				worldHeadLoc[Z] = 243;
+			}
+			glFrustum(nearPlane*(-screenWidthCm - worldHeadLoc[X]/1)/worldHeadLoc[Z], nearPlane*(screenWidthCm - worldHeadLoc[X]/1)/worldHeadLoc[Z], nearPlane*(-screenHeightCm - worldHeadLoc[Y]/1)/worldHeadLoc[Z], nearPlane*(screenHeightCm - worldHeadLoc[Y]/1)/worldHeadLoc[Z], nearPlane, 200000.0);
+			gluLookAt(worldHeadLoc[X], worldHeadLoc[Y], worldHeadLoc[Z], worldHeadLoc[X], worldHeadLoc[Y], 0, 0, 1, 0);
+		
+			isRightEye = !isRightEye;
+	
+			// Translations
+			glTranslatef(xpos, ypos, zpos);
+	
+			// Rotations
+			glRotatef(zrot, 0,0,1);        
+			glRotatef(yrot, 0,1,0);
+			glRotatef(xrot, 1,0,0);
+
+			glScalef(scale, scale, scale);
 	}
-	else
-	{
-	worldHeadLoc[X] = kinectOffsetCm[X];
-	worldHeadLoc[Y] = kinectOffsetCm[Y];
-	worldHeadLoc[Z] = kinectOffsetCm[Z]; 
-	}
-
-	if(infoToggle)
-	{
-		cout << worldHeadLoc[X] << "      " << worldHeadLoc[Y] << "      " << worldHeadLoc[Z] << endl;
-	
-	}
-	
-
-	glPushMatrix();
-		//Draw Scene
-		//spheres();
-		//scene();	
-	glPopMatrix();
-	drawMesh();
-	
-	string framerate =  std::to_string(static_cast<long long>(fps));
-
-	glColor3f(1.0, 0.0, 0.0);	
-	glRasterPos3f(screenWidthCm - (screenWidthCm/8),screenHeightCm-(screenHeightCm/8),0);
-	for(int i = 0; i < framerate.length(); i++)
-	{
-
-		glutBitmapCharacter(GLUT_BITMAP_TIMES_ROMAN_24, framerate[i]);
-	}
-
-	glMatrixMode(GL_PROJECTION);
-	glLoadIdentity();
-
-	//Functional
-	
-	if(!yzTracking)
-	{
-		//Setting these two values gets you 1D tracking, just set to near expected or average values (Likely will make later set to last known/average headLoc[Y] and headLoc[Z]
-		worldHeadLoc[Y] = 38;
-		worldHeadLoc[Z] = 243;
-	}
-	glFrustum(nearPlane*(-screenWidthCm - worldHeadLoc[X]/1)/worldHeadLoc[Z], nearPlane*(screenWidthCm - worldHeadLoc[X]/1)/worldHeadLoc[Z], nearPlane*(-screenHeightCm - worldHeadLoc[Y]/1)/worldHeadLoc[Z], nearPlane*(screenHeightCm - worldHeadLoc[Y]/1)/worldHeadLoc[Z], nearPlane, 200000.0);
-	gluLookAt(worldHeadLoc[X], worldHeadLoc[Y], worldHeadLoc[Z], worldHeadLoc[X], worldHeadLoc[Y], 0, 0, 1, 0);
-
-	
-	// Translations
-	glTranslatef (xpos, ypos, zpos);
-	
-	// Rotations
-	glRotatef (zrot, 0,0,1);        
-	glRotatef (yrot, 0,1,0);
-	glRotatef (xrot, 1,0,0);
-
 	glutSwapBuffers();
     calculateFPS();
 }
@@ -818,19 +871,43 @@ int main(int argc, char** argv)
 	}
 	cout << "Loading Textures and Scene \n";
 	glutInit(&argc, argv);
-	glutInitDisplayMode(GLUT_DOUBLE|GLUT_RGB|GLUT_DEPTH);
-	glutInitWindowSize(800, 450);
-	glutInitWindowPosition(0, 0);
-	glutCreateWindow("Kinect Headtracking OpenGL");
-	glutDisplayFunc(display);
-	glutIdleFunc(display); //To limit to whenever kinect is ready set to getSkeletonData
-	glutReshapeFunc(reshape);
-	glutKeyboardFunc(keyboard);
-	
-	init();
 
-	initTexturesBmp("textures\\bay\\bayScene");
-	initMesh("meshes\\xyzrgb_statuette_simpasdflify.ply", .15);
+	try
+	{
+		glutInitDisplayMode(GLUT_RGB|GLUT_DEPTH|GLUT_DOUBLE|GLUT_STEREO);
+		glutInitWindowSize(800, 450);
+		glutInitWindowPosition(0, 0);
+		glutCreateWindow("Kinect Headtracking OpenGL");
+		glutDisplayFunc(display);
+		glutIdleFunc(display); //To limit to whenever kinect is ready set to getSkeletonData
+		glutReshapeFunc(reshape);
+		glutKeyboardFunc(keyboard);
+	
+		init();
+
+		initTexturesBmp("textures\\bay\\bayScene");
+		initMesh("meshes\\xyzrgb_statuette.ply", 1/screenHeightCm*4);
+	}
+	catch(exception e)
+	{
+		cout << e.what();
+		system("pause");
+		exit(0);
+	}
+
+	GLboolean stereo = 0;
+
+	glGetBooleanv(GL_STEREO, &stereo);
+
+	if (stereo)
+	{
+		cout << "Stero ready card detected :)" << endl;
+		glEnable(GLUT_STEREO);
+	}
+	else
+	{
+		cout << "Stereo ready card not detected :(" << endl;
+	}
 
 	glutMainLoop();   
 }
