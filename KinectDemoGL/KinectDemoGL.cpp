@@ -37,9 +37,13 @@ const float screenHeightCm = 34.2/2;
 const float kinectOffsetCm[3] = {0,13,0};
 const int BMPHEADERSIZE = 54;
 
+//Some consts for better readability of code when using arrays
 const int X = 0;
 const int Y = 1;
 const int Z = 2;
+
+const int MIN = 0;
+const int MAX = 3;
 
 
 // Camera Postition Vars
@@ -105,6 +109,11 @@ Vector4 skeletonPosition[NUI_SKELETON_POSITION_COUNT];
 bool infoToggle = false;
 bool yzTracking = false;
 bool drawCenter = false;
+bool kinectToggle = true;
+bool fpsToggle = true;
+int whichDisplayType = 0;
+bool leftRightToggle = true;
+bool invertEyes = false;
 //Window Vars
 int pixelWidth;
 int pixelHeight;
@@ -115,11 +124,11 @@ int fps = 0;
 float currentTime = 0.0;
 float previousTime = 0.0;
 //3D Display Vars
-float eyeDistCm = 3.0;
+float eyeDistCm = 1.5;
 bool isRightEye = false;
 //Debug Vars
 float ofTesting = 0;
-float ofTesting1 = 0;
+float ofTesting1 = 1;
 float ofTesting2 = 0;
 
 bool initKinect() 
@@ -273,7 +282,9 @@ void initMesh(char* filename, float meshScale)
  
 	faces_Triangles = (float*) malloc(fileSize*sizeof(float));
 	normals  = (float*) malloc(fileSize*sizeof(float));
- 
+
+	float boundingBox[6] = {0,0,0,0,0,0};
+	float meshSize[3];
 
 	int i = 0;   
 	int temp = 0;
@@ -323,10 +334,42 @@ void initMesh(char* filename, float meshScale)
 	{
 		fgets(buffer,300,file);
  
-		sscanf(buffer,"%f %f %f", &vertex_Buffer[i], &vertex_Buffer[i+1], &vertex_Buffer[i+2]);
+		sscanf(buffer,"%f %f %f", &vertex_Buffer[i+X], &vertex_Buffer[i+Y], &vertex_Buffer[i+Z]);
+			
+		if(vertex_Buffer[i+X] < boundingBox[X+MIN])
+			{
+				boundingBox[X+MIN] = vertex_Buffer[i+X];
+			}
+			if(vertex_Buffer[i+X] > boundingBox[X+MAX])
+			{
+				boundingBox[X+MAX] = vertex_Buffer[i+X];
+			}
+			if(vertex_Buffer[i+Y] < boundingBox[Y+MIN])
+			{
+				boundingBox[Y+MIN] = vertex_Buffer[i+Y];
+			}
+			if(vertex_Buffer[i+Y] > boundingBox[Y+MAX])
+			{
+				boundingBox[Y+MAX] = vertex_Buffer[i+Y];
+			}
+			if(vertex_Buffer[i+Z] < boundingBox[Z+MIN])
+			{
+				boundingBox[Z+MIN] = vertex_Buffer[i+Z];
+			}
+			if(vertex_Buffer[i+Z] > boundingBox[Z+MAX])
+			{
+				boundingBox[Z+MAX] = vertex_Buffer[i+Z];
+			}
+
+
 		i += 3;
 	}
- 
+ 		
+	meshSize[X] = (abs(boundingBox[X+MIN]) + abs(boundingBox[X+MAX]));//*(screenWidthCm/screenHeightCm);
+	meshSize[Y] = (abs(boundingBox[Y+MIN]) + abs(boundingBox[Y+MAX]));//*(screenWidthCm/screenHeightCm);
+	meshSize[Z] = (abs(boundingBox[Z+MIN]) + abs(boundingBox[Z+MAX]));//*(screenWidthCm/screenHeightCm);
+
+
 	// read faces
 	i =0;
 	for (int iterator = 0; iterator < totalFaces; iterator++)
@@ -347,16 +390,17 @@ void initMesh(char* filename, float meshScale)
 			//  vertex == punt van vertex lijst
 			// vertex_buffer -> xyz xyz xyz xyz
 			//printf("%f %f %f ", Vertex_Buffer[3*vertex1], Vertex_Buffer[3*vertex1+1], Vertex_Buffer[3*vertex1+2]);
- 
-			faces_Triangles[triangle_index]   = vertex_Buffer[3*vertex1]*meshScale;
-			faces_Triangles[triangle_index+1] = vertex_Buffer[3*vertex1+1]*meshScale;
-			faces_Triangles[triangle_index+2] = vertex_Buffer[3*vertex1+2]*meshScale+(1.5/meshScale);
-			faces_Triangles[triangle_index+3] = vertex_Buffer[3*vertex2]*meshScale;
-			faces_Triangles[triangle_index+4] = vertex_Buffer[3*vertex2+1]*meshScale;
-			faces_Triangles[triangle_index+5] = vertex_Buffer[3*vertex2+2]*meshScale+(1.5/meshScale);
-			faces_Triangles[triangle_index+6] = vertex_Buffer[3*vertex3]*meshScale;
-			faces_Triangles[triangle_index+7] = vertex_Buffer[3*vertex3+1]*meshScale;
-			faces_Triangles[triangle_index+8] = vertex_Buffer[3*vertex3+2]*meshScale+(1.5/meshScale);
+
+			//+((-meshSize[X]/2)-abs(boundingBox[X+MIN]))) possible pos change to get centered with point 0,0,0
+			faces_Triangles[triangle_index]   = (vertex_Buffer[3*vertex1+X])*(meshScale/meshSize[Y]);
+			faces_Triangles[triangle_index+1] = (vertex_Buffer[3*vertex1+Y])*(meshScale/meshSize[Y]);
+			faces_Triangles[triangle_index+2] = (vertex_Buffer[3*vertex1+Z])*(meshScale/meshSize[Y]);
+			faces_Triangles[triangle_index+3] = (vertex_Buffer[3*vertex2+X])*(meshScale/meshSize[Y]);
+			faces_Triangles[triangle_index+4] = (vertex_Buffer[3*vertex2+Y])*(meshScale/meshSize[Y]);
+			faces_Triangles[triangle_index+5] = (vertex_Buffer[3*vertex2+Z])*(meshScale/meshSize[Y]);
+			faces_Triangles[triangle_index+6] = (vertex_Buffer[3*vertex3+X])*(meshScale/meshSize[Y]);
+			faces_Triangles[triangle_index+7] = (vertex_Buffer[3*vertex3+Y])*(meshScale/meshSize[Y]);
+			faces_Triangles[triangle_index+8] = (vertex_Buffer[3*vertex3+Z])*(meshScale/meshSize[Y]);
  
 			float coord1[3] = {faces_Triangles[triangle_index],	faces_Triangles[triangle_index+1], faces_Triangles[triangle_index+2]};
 			float coord2[3] = {faces_Triangles[triangle_index+3],	faces_Triangles[triangle_index+4], faces_Triangles[triangle_index+5]};
@@ -386,17 +430,21 @@ void initMesh(char* filename, float meshScale)
 }
 
  
-void drawMesh()
+void drawMesh(float xRot, float yRot, float zRot)
 {
-				
+	glPushMatrix();	
 	//Mesh Light Test
+	glRotatef(xRot, 1, 0, 0);
+	glRotatef(yRot, 0, 1, 0);
+	glRotatef(zRot, 0, 0, 1);
+
 	glEnable(GL_LIGHTING);
 	glEnable(GL_LIGHT0);
 	glLightfv(GL_LIGHT0, GL_AMBIENT, ambientLight);
 	glLightfv(GL_LIGHT0, GL_DIFFUSE, diffuseLight);
 	glLightfv(GL_LIGHT0, GL_SPECULAR, specularLight);
 	glLightfv(GL_LIGHT0, GL_POSITION, lightPosition);
-
+	
 	if(isRightEye) //Allow for different collor for each eye for testing
 	{
 		glMaterialfv(GL_FRONT_AND_BACK, GL_AMBIENT, red);
@@ -418,18 +466,7 @@ void drawMesh()
 	glDisableClientState(GL_NORMAL_ARRAY);
 	glDisable(GL_LIGHT0);
 	glDisable(GL_LIGHTING);
-
-	if(drawCenter)
-	{
-		//Test cylinder to show center of "rotation" during headtracking
-		glPushMatrix();
-			glRotatef(-90,1,0,0);
-			glTranslatef(0, 0, -50);
-			glColor3f(0.0,0.0,0.0);
-			GLUquadricObj *quadObj = gluNewQuadric();
-			gluCylinder(quadObj, 1, 1, 4000, 100, 100);
-		glPopMatrix();
-	}
+	glPopMatrix();
 }
 
 
@@ -672,7 +709,8 @@ void keyboard (unsigned char key, int x, int y) {
 
 			break;
 		case 'i':
-			infoToggle = !infoToggle;
+			eyeDistCm = -eyeDistCm;
+			invertEyes = !invertEyes;
 			break;
 		case 'r':
 			glutPostRedisplay();
@@ -682,6 +720,12 @@ void keyboard (unsigned char key, int x, int y) {
 			break;
 		case 'c':
 			drawCenter = !drawCenter;
+			break;
+		case 'k':
+			kinectToggle = !kinectToggle;
+			break;
+		case 'f':
+			fpsToggle = !fpsToggle;
 			break;
 		case 'W': 
 			xrot += 1;
@@ -708,27 +752,27 @@ void keyboard (unsigned char key, int x, int y) {
 			glutPostRedisplay();  
 			break;
 		case '7': 
-			ofTesting += 10;
+			ofTesting += 1;
 			glutPostRedisplay(); 
 			break;
 		case '4': 
-			ofTesting -= 10;
+			ofTesting -= 1;
 			glutPostRedisplay();
 			break;
 		case '8': 
-			ofTesting1 += 10;
+			ofTesting1 += .1;
 			glutPostRedisplay();
 			break;
 		case '5': 
-			ofTesting1 -= 10;
+			ofTesting1 -= .1;
 			glutPostRedisplay();
 			break;
 		case '9': 
-			eyeDistCm += .5;
+			eyeDistCm += .1;
 			glutPostRedisplay();
 			break;
 		case '6': 
-			eyeDistCm -= .5;
+			eyeDistCm -= .1;
 			glutPostRedisplay();
 			break;
 		case '+':
@@ -739,6 +783,16 @@ void keyboard (unsigned char key, int x, int y) {
 			break;
 		case ' ':
 			glutFullScreen();
+			break;
+		case 127:
+			if(whichDisplayType < 2)
+			{
+				whichDisplayType++;
+			}
+			else
+			{
+				whichDisplayType = 0;
+			}
 			break;
 
 		default :  printf ("   key = %c -> %d\n", key, key);
@@ -755,12 +809,14 @@ void display()
 	{
 		if(sensor)
 		{
-			getSkeletalData();
-
+			if(kinectToggle)
+			{
+				getSkeletalData();
+			}
 			//grab head positions and convert to cm, offset values based on where the kinect is relative to screengithub
-			worldHeadLoc[X] = skeletonPosition[NUI_SKELETON_POSITION_HEAD].x * 100 + kinectOffsetCm[X];
-			worldHeadLoc[Y] = skeletonPosition[NUI_SKELETON_POSITION_HEAD].y * 100 + kinectOffsetCm[Y];
-			worldHeadLoc[Z] = skeletonPosition[NUI_SKELETON_POSITION_HEAD].z * 100 + kinectOffsetCm[Z]; 
+			worldHeadLoc[X] = (skeletonPosition[NUI_SKELETON_POSITION_HEAD].x/ofTesting1) * 100 + kinectOffsetCm[X];
+			worldHeadLoc[Y] = (skeletonPosition[NUI_SKELETON_POSITION_HEAD].y/ofTesting1) * 100 + kinectOffsetCm[Y];
+			worldHeadLoc[Z] = (skeletonPosition[NUI_SKELETON_POSITION_HEAD].z/ofTesting1) * 100 + kinectOffsetCm[Z]; 
 		}
 		else
 		{
@@ -769,34 +825,101 @@ void display()
 			worldHeadLoc[Z] = kinectOffsetCm[Z]; 
 		}
 
-		if(infoToggle)
+		/*if(infoToggle)
 		{
 			cout << worldHeadLoc[X] << "      " << worldHeadLoc[Y] << "      " << worldHeadLoc[Z] << endl;
 	
-		}
+		}*/
 	
+		if(whichDisplayType == 0)
+		{
+			glViewport(0,0, pixelWidth, pixelHeight);
+			if(isRightEye) //Draw Which Eye
+			{
+				glDrawBuffer(GL_BACK_LEFT);
+				glClear(GL_COLOR_BUFFER_BIT|GL_DEPTH_BUFFER_BIT);
+			}
+			else //Draw Other Eye
+			{
+				glDrawBuffer(GL_BACK_RIGHT);
+				glClear(GL_COLOR_BUFFER_BIT|GL_DEPTH_BUFFER_BIT);
+			}
+		}
+		else if (whichDisplayType == 1)
+		{
+			glDrawBuffer(GL_BACK);
+			if(isRightEye) //Draw Which Eye
+			{
+				glViewport(0,0, pixelWidth/2, pixelHeight);
+			}
+			else
+			{
+				glViewport(pixelWidth/2,0, pixelWidth/2, pixelHeight);
+		
+			}
+		}
+		else if (whichDisplayType == 2)
+		{
+			glDrawBuffer(GL_BACK);
+			if(isRightEye) //Draw Which Eye
+			{
+				glViewport(0,0, pixelWidth, pixelHeight/2);
+			}
+			else
+			{
+				glViewport(0,pixelHeight/2, pixelWidth, pixelHeight/2);
+		
+			}			
+		}
 
-		if(isRightEye) //Draw Which Eye
-		{
-			glDrawBuffer(GL_BACK_LEFT);
-		    glClear(GL_COLOR_BUFFER_BIT|GL_DEPTH_BUFFER_BIT);
-		}
-		else //Draw Right Eye
-		{
-			glDrawBuffer(GL_BACK_RIGHT);
-			glClear(GL_COLOR_BUFFER_BIT|GL_DEPTH_BUFFER_BIT);
-		}
-			glPushMatrix();
-				//Draw Scene
-				//spheres();
-				//scene();	
-				drawMesh();
-			glPopMatrix();
+
+
+		glPushMatrix();
+			//Draw Scene
+			//spheres();
+			//scene();	
+			drawMesh(90, 0, 0);
+		glPopMatrix();
 
 
 		
-			string framerate =  std::to_string(static_cast<long long>(fps));
+		string framerate =  std::to_string(static_cast<long long>(fps));
+		glMatrixMode(GL_PROJECTION);
+		glLoadIdentity();
 
+		//Functional
+		if(isRightEye)
+		{
+			worldHeadLoc[X] += eyeDistCm;
+		}
+		else
+		{
+			worldHeadLoc[X] -= eyeDistCm;
+		}
+		if(!yzTracking)
+		{
+			//Setting these two values gets you 1D tracking, just set to near expected or average values (Likely will make later set to last known/average headLoc[Y] and headLoc[Z]
+			worldHeadLoc[Y] = 38*ofTesting1;
+			worldHeadLoc[Z] = 243*ofTesting1;
+		}
+		glFrustum(nearPlane*(-screenWidthCm - worldHeadLoc[X]/1)/worldHeadLoc[Z], nearPlane*(screenWidthCm - worldHeadLoc[X]/1)/worldHeadLoc[Z], nearPlane*(-screenHeightCm - worldHeadLoc[Y]/1)/worldHeadLoc[Z], nearPlane*(screenHeightCm - worldHeadLoc[Y]/1)/worldHeadLoc[Z], nearPlane, 200000.0);
+		gluLookAt(worldHeadLoc[X], worldHeadLoc[Y], worldHeadLoc[Z], worldHeadLoc[X], worldHeadLoc[Y], 0, 0, 1, 0);
+		
+		isRightEye = !isRightEye;
+	
+		if(drawCenter)
+		{
+			//Test cylinder to show center of "rotation" during headtracking
+			glPushMatrix();
+				glRotatef(-90,1,0,0);
+				glTranslatef(0, 0, -50);
+				glColor3f(0.0,0.0,0.0);
+				GLUquadricObj *quadObj = gluNewQuadric();
+				gluCylinder(quadObj, 1, 1, 4000, 100, 100);
+			glPopMatrix();
+		}
+		if(fpsToggle)
+		{
 			glColor3f(1.0, 0.0, 0.0);	
 			glRasterPos3f(screenWidthCm - (screenWidthCm/8),screenHeightCm-(screenHeightCm/8),0);
 			for(int i = 0; i < framerate.length(); i++)
@@ -804,39 +927,52 @@ void display()
 
 				glutBitmapCharacter(GLUT_BITMAP_TIMES_ROMAN_24, framerate[i]);
 			}
-
-			glMatrixMode(GL_PROJECTION);
-			glLoadIdentity();
-
-			//Functional
-			if(isRightEye)
+		}
+		if(leftRightToggle)
+		{
+			if(i==0)
 			{
-				worldHeadLoc[X] += eyeDistCm;
+				if(!invertEyes)
+				{
+					glColor3f(1.0, 0.0, 0.0);	
+					glRasterPos3f(screenWidthCm - (screenWidthCm/8),-screenHeightCm+(screenHeightCm/8),0);
+					glutBitmapCharacter(GLUT_BITMAP_TIMES_ROMAN_24, 'r');
+			
+				}
+				else
+				{
+					glColor3f(0.0, 0.0, 1.0);	
+					glRasterPos3f(-screenWidthCm + (screenWidthCm/8),-screenHeightCm+(screenHeightCm/8),0);
+					glutBitmapCharacter(GLUT_BITMAP_TIMES_ROMAN_24, 'l');
+				}
+
 			}
 			else
 			{
-				worldHeadLoc[X] -= eyeDistCm;
+				if(!invertEyes)
+				{
+					glColor3f(0.0, 0.0, 1.0);	
+					glRasterPos3f(-screenWidthCm + (screenWidthCm/8),-screenHeightCm+(screenHeightCm/8),0);
+					glutBitmapCharacter(GLUT_BITMAP_TIMES_ROMAN_24, 'l');
+			
+				}
+				else
+				{
+					glColor3f(1.0, 0.0, 0.0);
+					glRasterPos3f(screenWidthCm - (screenWidthCm/8),-screenHeightCm+(screenHeightCm/8),0);
+					glutBitmapCharacter(GLUT_BITMAP_TIMES_ROMAN_24, 'r');
+				}
 			}
-			if(!yzTracking)
-			{
-				//Setting these two values gets you 1D tracking, just set to near expected or average values (Likely will make later set to last known/average headLoc[Y] and headLoc[Z]
-				worldHeadLoc[Y] = 38;
-				worldHeadLoc[Z] = 243;
-			}
-			glFrustum(nearPlane*(-screenWidthCm - worldHeadLoc[X]/1)/worldHeadLoc[Z], nearPlane*(screenWidthCm - worldHeadLoc[X]/1)/worldHeadLoc[Z], nearPlane*(-screenHeightCm - worldHeadLoc[Y]/1)/worldHeadLoc[Z], nearPlane*(screenHeightCm - worldHeadLoc[Y]/1)/worldHeadLoc[Z], nearPlane, 200000.0);
-			gluLookAt(worldHeadLoc[X], worldHeadLoc[Y], worldHeadLoc[Z], worldHeadLoc[X], worldHeadLoc[Y], 0, 0, 1, 0);
-		
-			isRightEye = !isRightEye;
+		}
+		// Translations
+		glTranslatef(xpos, ypos, zpos);
 	
-			// Translations
-			glTranslatef(xpos, ypos, zpos);
-	
-			// Rotations
-			glRotatef(zrot, 0,0,1);        
-			glRotatef(yrot, 0,1,0);
-			glRotatef(xrot, 1,0,0);
+		// Rotations
+		glRotatef(zrot, 0,0,1);        
+		glRotatef(yrot, 0,1,0);
+		glRotatef(xrot, 1,0,0);
 
-			glScalef(scale, scale, scale);
+		glScalef(scale, scale, scale);
 	}
 	glutSwapBuffers();
     calculateFPS();
@@ -848,7 +984,6 @@ void reshape(int w, int h)
 	pixelWidth = w;
 	pixelHeight = h;
 	pixelRatio = (float)w/h;
-	glViewport(0,0, w, h);
 }
 
 
@@ -876,6 +1011,7 @@ int main(int argc, char** argv)
 	{
 		glutInitDisplayMode(GLUT_RGB|GLUT_DEPTH|GLUT_DOUBLE|GLUT_STEREO);
 		glutInitWindowSize(800, 450);
+		pixelRatio = (float)800/450;
 		glutInitWindowPosition(0, 0);
 		glutCreateWindow("Kinect Headtracking OpenGL");
 		glutDisplayFunc(display);
@@ -884,9 +1020,8 @@ int main(int argc, char** argv)
 		glutKeyboardFunc(keyboard);
 	
 		init();
-
 		initTexturesBmp("textures\\bay\\bayScene");
-		initMesh("meshes\\xyzrgb_statuette.ply", 1/screenHeightCm*4);
+		initMesh("meshes\\xyzrgb_statuette_simplify.ply", 75);
 	}
 	catch(exception e)
 	{
