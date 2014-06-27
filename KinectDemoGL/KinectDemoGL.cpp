@@ -26,15 +26,14 @@ using namespace std;
 const int BLURFREQUENCY = 0;
 const int TEXTURECOUNT = 1;
 const double PI = 3.14159265358979323846;
-//Collab 4K tv 142.3 cm Width 80.5 Height
-//Collab Resolution 3840 x 2160
 
+//Collab 4K tv 142.3 cm Width 80.5 Height
 //Laptop 34.5 cm Width 19.5 Height
-//Laptop Resolution 1920 x 1080
+//Asus 3D Display 60.2 cm Width 34.2 cm Height
+
 //In centimeters
 const float screenWidthCm = 60.2/2;
 const float screenHeightCm = 34.2/2;
-const float kinectOffsetCm[3] = {0,13,0};
 const int BMPHEADERSIZE = 54;
 
 //Some consts for better readability of code when using arrays
@@ -80,6 +79,14 @@ int totalConnectedQuads;
 int totalConnectedPoints;
 int totalFaces;
 
+float meshxpos = 0;
+float meshypos = 0;
+float meshzpos = 0;
+
+float meshxrot = 0;
+float meshyrot = 0;
+float meshzrot = 0;
+
 
 //Lighting Vars
 GLfloat lightPosition[]    = {0, screenHeightCm, 0, 0.0};
@@ -103,6 +110,7 @@ GLfloat specularLight[]    = {1.0, 1.0, 1.0, 1.0};
 HANDLE depthStream;
 INuiSensor* sensor;
 Vector4 skeletonPosition[NUI_SKELETON_POSITION_COUNT];
+float kinectOffsetCm[3] = {0,0,0};
 
 
 //Generic Vars
@@ -124,7 +132,7 @@ int fps = 0;
 float currentTime = 0.0;
 float previousTime = 0.0;
 //3D Display Vars
-float eyeDistCm = 1.5;
+float eyeDistCm = 3;
 bool isRightEye = false;
 //Debug Vars
 float ofTesting = 0;
@@ -256,11 +264,20 @@ float* calculateNormal( float *coord1, float *coord2, float *coord3 )
 	return norm;
 }
 
-void initMesh(char* filename, float meshScale)
+void initMesh(char* filename, float meshScaleX, float meshScaleY, float meshScaleZ, float xPos, float yPos, float zPos, float xRot, float yRot, float zRot)
 {
 	totalConnectedTriangles = 0; 
 	totalConnectedQuads = 0;
 	totalConnectedPoints = 0;
+	
+	meshxpos = xPos;
+	meshypos = yPos;
+	meshzpos = zPos;
+	
+	meshxrot = xRot;
+	meshyrot = yRot;
+	meshzrot = zRot;
+
  
 
 	FILE* file = fopen(filename,"r");
@@ -392,15 +409,15 @@ void initMesh(char* filename, float meshScale)
 			//printf("%f %f %f ", Vertex_Buffer[3*vertex1], Vertex_Buffer[3*vertex1+1], Vertex_Buffer[3*vertex1+2]);
 
 			//+((-meshSize[X]/2)-abs(boundingBox[X+MIN]))) possible pos change to get centered with point 0,0,0
-			faces_Triangles[triangle_index]   = (vertex_Buffer[3*vertex1+X])*(meshScale/meshSize[Y]);
-			faces_Triangles[triangle_index+1] = (vertex_Buffer[3*vertex1+Y])*(meshScale/meshSize[Y]);
-			faces_Triangles[triangle_index+2] = (vertex_Buffer[3*vertex1+Z])*(meshScale/meshSize[Y]);
-			faces_Triangles[triangle_index+3] = (vertex_Buffer[3*vertex2+X])*(meshScale/meshSize[Y]);
-			faces_Triangles[triangle_index+4] = (vertex_Buffer[3*vertex2+Y])*(meshScale/meshSize[Y]);
-			faces_Triangles[triangle_index+5] = (vertex_Buffer[3*vertex2+Z])*(meshScale/meshSize[Y]);
-			faces_Triangles[triangle_index+6] = (vertex_Buffer[3*vertex3+X])*(meshScale/meshSize[Y]);
-			faces_Triangles[triangle_index+7] = (vertex_Buffer[3*vertex3+Y])*(meshScale/meshSize[Y]);
-			faces_Triangles[triangle_index+8] = (vertex_Buffer[3*vertex3+Z])*(meshScale/meshSize[Y]);
+			faces_Triangles[triangle_index]   = (vertex_Buffer[3*vertex1+X])*(meshScaleX/meshSize[X]);
+			faces_Triangles[triangle_index+1] = (vertex_Buffer[3*vertex1+Y])*(meshScaleY/meshSize[Y]);
+			faces_Triangles[triangle_index+2] = (vertex_Buffer[3*vertex1+Z])*(meshScaleZ/meshSize[Z]);
+			faces_Triangles[triangle_index+3] = (vertex_Buffer[3*vertex2+X])*(meshScaleX/meshSize[X]);
+			faces_Triangles[triangle_index+4] = (vertex_Buffer[3*vertex2+Y])*(meshScaleY/meshSize[Y]);
+			faces_Triangles[triangle_index+5] = (vertex_Buffer[3*vertex2+Z])*(meshScaleZ/meshSize[Z]);
+			faces_Triangles[triangle_index+6] = (vertex_Buffer[3*vertex3+X])*(meshScaleX/meshSize[X]);
+			faces_Triangles[triangle_index+7] = (vertex_Buffer[3*vertex3+Y])*(meshScaleY/meshSize[Y]);
+			faces_Triangles[triangle_index+8] = (vertex_Buffer[3*vertex3+Z])*(meshScaleZ/meshSize[Z]);
  
 			float coord1[3] = {faces_Triangles[triangle_index],	faces_Triangles[triangle_index+1], faces_Triangles[triangle_index+2]};
 			float coord2[3] = {faces_Triangles[triangle_index+3],	faces_Triangles[triangle_index+4], faces_Triangles[triangle_index+5]};
@@ -430,20 +447,27 @@ void initMesh(char* filename, float meshScale)
 }
 
  
-void drawMesh(float xRot, float yRot, float zRot)
+void drawMesh()
 {
 	glPushMatrix();	
 	//Mesh Light Test
-	glRotatef(xRot, 1, 0, 0);
-	glRotatef(yRot, 0, 1, 0);
-	glRotatef(zRot, 0, 0, 1);
+
+
+	glRotatef(meshxrot, 1, 0, 0);
+	glRotatef(meshyrot, 0, 1, 0);
+	glRotatef(meshzrot, 0, 0, 1);
+	glTranslatef(meshxpos, meshypos, meshzpos);
+
 
 	glEnable(GL_LIGHTING);
 	glEnable(GL_LIGHT0);
 	glLightfv(GL_LIGHT0, GL_AMBIENT, ambientLight);
 	glLightfv(GL_LIGHT0, GL_DIFFUSE, diffuseLight);
 	glLightfv(GL_LIGHT0, GL_SPECULAR, specularLight);
-	glLightfv(GL_LIGHT0, GL_POSITION, lightPosition);
+
+	GLfloat tempLightLoc[4] = {screenHeightCm, screenHeightCm, screenHeightCm, 0};
+	glLightfv(GL_LIGHT0, GL_POSITION, tempLightLoc);
+	
 	
 	if(isRightEye) //Allow for different collor for each eye for testing
 	{
@@ -472,7 +496,7 @@ void drawMesh(float xRot, float yRot, float zRot)
 
 void spheres()
 {
-
+	glPushMatrix();
 	glTranslatef(0,0,-screenHeightCm);
     // Enable lighting
     glEnable(GL_LIGHTING);
@@ -542,12 +566,13 @@ void spheres()
 
     glDisable(GL_LIGHTING);
     glDisable(GL_LIGHT0);
-
+	glPopMatrix(); 
 }
 
 void scene()
 {
-
+	glPushMatrix();
+	glTranslatef(0,0,-screenHeightCm);
 	glEnable(GL_TEXTURE_2D);
 
 	glTexImage2D(GL_TEXTURE_2D, 0,GL_RGB, textureWidth[textureToLoad], textureHeight[textureToLoad], 0, GL_BGR_EXT, GL_UNSIGNED_BYTE, textureData[textureToLoad]);
@@ -638,6 +663,7 @@ void scene()
 
 	glDisable(GL_TEXTURE_2D);
 	glDisable(GL_BLEND);
+	glPopMatrix(); 
 }
 
 void calculateFPS()
@@ -671,11 +697,11 @@ void keyboard (unsigned char key, int x, int y) {
 		case  27:  
 			exit (0);
 		case 'w': 
-			zpos += 10;
+			zpos += 1;
 			glutPostRedisplay();  
 			break;
 		case 's': 
-			zpos -= 10;
+			zpos -= 1;
 			glutPostRedisplay();  
 			break;
 		case 'a': 
@@ -774,6 +800,11 @@ void keyboard (unsigned char key, int x, int y) {
 		case '6': 
 			eyeDistCm -= .1;
 			glutPostRedisplay();
+			break;
+		case '0':
+			kinectOffsetCm[X] = -(skeletonPosition[NUI_SKELETON_POSITION_HEAD].x/ofTesting1) * 100;
+			kinectOffsetCm[Y] = -(skeletonPosition[NUI_SKELETON_POSITION_HEAD].y/ofTesting1) * 100;
+			//kinectOffsetCm[Z] = -worldHeadLoc[Z];
 			break;
 		case '+':
 			scale *=2;
@@ -878,7 +909,7 @@ void display()
 			//Draw Scene
 			//spheres();
 			//scene();	
-			drawMesh(90, 0, 0);
+			drawMesh();
 		glPopMatrix();
 
 
@@ -1021,7 +1052,7 @@ int main(int argc, char** argv)
 	
 		init();
 		initTexturesBmp("textures\\bay\\bayScene");
-		initMesh("meshes\\xyzrgb_statuette_simplify.ply", 75);
+		initMesh("meshes\\xyzrgb_statuette_simplify.ply", 9, 15.5, 8, 5, -5.35, 17, 0, 0, 0);
 	}
 	catch(exception e)
 	{
