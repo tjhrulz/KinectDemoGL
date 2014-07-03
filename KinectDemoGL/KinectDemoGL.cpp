@@ -32,8 +32,15 @@ const double PI = 3.14159265358979323846;
 //Asus 3D Display 60.2 cm Width 34.2 cm Height
 
 //In centimeters
-const float screenWidthCm = 60.2/2;
-const float screenHeightCm = 34.2/2;
+const float screenWidthCmActive = 60.2/2;
+const float screenHeightCmActive = 34.2/2;
+
+const float screenWidthCmPassive = 142.3/2;
+const float screenHeightCmPassive = 80.5/2;
+
+float screenWidthCm = 0.0;
+float screenHeightCm = 0.0;
+
 const int BMPHEADERSIZE = 54;
 
 //Some consts for better readability of code when using arrays
@@ -89,8 +96,6 @@ float meshzrot = 0;
 
 
 //Lighting Vars
-GLfloat lightPosition[]    = {0, screenHeightCm, 0, 0.0};
-
 GLfloat green[] = {0.0, 1.0, 0.0, 1.0}; //Green Color
 GLfloat blue[] = {0.0, 0.0, 1.0, 1.0}; //Blue Color
 GLfloat orange[] = {1.0, 0.5, 0.0, 1.0}; //Orange Color
@@ -102,8 +107,10 @@ GLfloat red[] = {1.0, 0.0, 0.0, 1.0}; //Red Color
 GLfloat white[] = {1.0, 1.0, 1.0, 1.0}; //White Color
 
 GLfloat ambientLight[]    = {0.2, 0.2, 0.2, 1.0};
-GLfloat diffuseLight[]    = {0.8, 0.8, 0.8, 1.0};
-GLfloat specularLight[]    = {1.0, 1.0, 1.0, 1.0};
+GLfloat diffuseLight[]    = {0.5, 0.5, 0.5, 1.0};
+GLfloat specularLight[]    = {0.2, 0.2, 0.2, 1.0};
+
+GLfloat lightPosition[] = {0, 0, 0, 0};
 
 
 //Kinect Vars
@@ -122,6 +129,8 @@ bool fpsToggle = true;
 int whichDisplayType = 0;
 bool leftRightToggle = true;
 bool invertEyes = false;
+bool isFullscreen = false;
+bool initCompleted = false;
 //Window Vars
 int pixelWidth;
 int pixelHeight;
@@ -132,12 +141,16 @@ int fps = 0;
 float currentTime = 0.0;
 float previousTime = 0.0;
 //3D Display Vars
-float eyeDistCm = 3;
+float eyeDistCm = 8.0/2;
 bool isRightEye = false;
 //Debug Vars
-float ofTesting = 0;
+float ofTesting = 1;
 float ofTesting1 = 1;
 float ofTesting2 = 0;
+//Scene Vars
+bool drawSceneOne = true;
+bool drawSceneTwo = true;
+bool drawSceneThree = false;
 
 bool initKinect() 
 {
@@ -450,24 +463,20 @@ void initMesh(char* filename, float meshScaleX, float meshScaleY, float meshScal
 void drawMesh()
 {
 	glPushMatrix();	
-	//Mesh Light Test
-
 
 	glRotatef(meshxrot, 1, 0, 0);
 	glRotatef(meshyrot, 0, 1, 0);
 	glRotatef(meshzrot, 0, 0, 1);
-	glTranslatef(meshxpos, meshypos, meshzpos);
-
-
+	glTranslatef(meshxpos, meshypos, meshzpos);	
+	
 	glEnable(GL_LIGHTING);
 	glEnable(GL_LIGHT0);
+
 	glLightfv(GL_LIGHT0, GL_AMBIENT, ambientLight);
 	glLightfv(GL_LIGHT0, GL_DIFFUSE, diffuseLight);
 	glLightfv(GL_LIGHT0, GL_SPECULAR, specularLight);
-
-	GLfloat tempLightLoc[4] = {screenHeightCm, screenHeightCm, screenHeightCm, 0};
-	glLightfv(GL_LIGHT0, GL_POSITION, tempLightLoc);
 	
+	glLightfv(GL_LIGHT0, GL_POSITION, lightPosition);
 	
 	if(isRightEye) //Allow for different collor for each eye for testing
 	{
@@ -488,8 +497,10 @@ void drawMesh()
 	glDrawArrays(GL_TRIANGLES, 0, totalConnectedTriangles);	
 	glDisableClientState(GL_VERTEX_ARRAY);    
 	glDisableClientState(GL_NORMAL_ARRAY);
-	glDisable(GL_LIGHT0);
+
 	glDisable(GL_LIGHTING);
+	glDisable(GL_LIGHT0);
+
 	glPopMatrix();
 }
 
@@ -497,24 +508,16 @@ void drawMesh()
 void spheres()
 {
 	glPushMatrix();
-	glTranslatef(0,0,-screenHeightCm);
-    // Enable lighting
-    glEnable(GL_LIGHTING);
-    glEnable(GL_LIGHT0);
+	glTranslatef(0,0,-screenHeightCm + 4*screenHeightCm);
 
-	// Set lighting intensity
-
+	glEnable(GL_LIGHTING);
+	glEnable(GL_LIGHT0);
 
 	glLightfv(GL_LIGHT0, GL_AMBIENT, ambientLight);
-    glLightfv(GL_LIGHT0, GL_DIFFUSE, diffuseLight);
-    glLightfv(GL_LIGHT0, GL_SPECULAR, specularLight);
-    
-    // Set the light position
-    glLightfv(GL_LIGHT0, GL_POSITION, lightPosition);
-
-	//Set light color
-	glMaterialfv(GL_FRONT_AND_BACK, GL_SPECULAR, white);
-	glMaterialf(GL_FRONT_AND_BACK, GL_SHININESS, 20);
+	glLightfv(GL_LIGHT0, GL_DIFFUSE, diffuseLight);
+	glLightfv(GL_LIGHT0, GL_SPECULAR, specularLight);
+	
+	glLightfv(GL_LIGHT0, GL_POSITION, lightPosition);
 
 	glMaterialfv(GL_FRONT_AND_BACK, GL_AMBIENT, green);
 	glMaterialfv(GL_FRONT_AND_BACK, GL_DIFFUSE, green);
@@ -563,9 +566,8 @@ void spheres()
 		glTranslatef (0.0, 0.0, 2* screenHeightCm); 
 		glutSolidSphere(1*screenHeightCm/8, 100, 100);
 	glPopMatrix();   
-
-    glDisable(GL_LIGHTING);
-    glDisable(GL_LIGHT0);
+	glDisable(GL_LIGHTING);
+	glDisable(GL_LIGHT0);
 	glPopMatrix(); 
 }
 
@@ -691,7 +693,45 @@ void calculateFPS()
     }
 }
 
-void keyboard (unsigned char key, int x, int y) {
+void setScreenSize()
+{
+	if(initCompleted)
+	{
+		if(whichDisplayType < 2)
+		{
+			whichDisplayType++;
+			screenWidthCm = screenWidthCmPassive;
+			screenHeightCm = screenHeightCmPassive;
+		}
+		else
+		{
+			whichDisplayType = 0;
+			screenWidthCm = screenWidthCmActive;
+			screenHeightCm = screenHeightCmActive;
+		}
+	}
+	else
+	{
+		if(whichDisplayType == 0)
+		{
+			screenWidthCm = screenWidthCmActive;
+			screenHeightCm = screenHeightCmActive;
+		}
+		else
+		{
+			screenWidthCm = screenWidthCmPassive;
+			screenHeightCm = screenHeightCmPassive;
+		}
+	}
+	//Any other variables set at startup but are based off screen size go here
+
+	lightPosition[0] = 10*screenHeightCm;
+	lightPosition[1] = 10*screenHeightCm;
+	lightPosition[2] = 10*screenHeightCm;
+}
+
+void keyboard (unsigned char key, int x, int y) 
+{
  
 	switch (key) {
 		case  27:  
@@ -778,11 +818,11 @@ void keyboard (unsigned char key, int x, int y) {
 			glutPostRedisplay();  
 			break;
 		case '7': 
-			ofTesting += 1;
+			ofTesting += .1;
 			glutPostRedisplay(); 
 			break;
 		case '4': 
-			ofTesting -= 1;
+			ofTesting -= .1;
 			glutPostRedisplay();
 			break;
 		case '8': 
@@ -806,6 +846,15 @@ void keyboard (unsigned char key, int x, int y) {
 			kinectOffsetCm[Y] = -(skeletonPosition[NUI_SKELETON_POSITION_HEAD].y/ofTesting1) * 100;
 			//kinectOffsetCm[Z] = -worldHeadLoc[Z];
 			break;
+		case'1':
+			drawSceneOne = !drawSceneOne;
+			break;
+		case'2':
+			drawSceneTwo = !drawSceneTwo;
+			break;
+		case'3':
+			drawSceneThree = !drawSceneThree;
+			break;
 		case '+':
 			scale *=2;
 			break;
@@ -813,17 +862,21 @@ void keyboard (unsigned char key, int x, int y) {
 			scale /=2;
 			break;
 		case ' ':
-			glutFullScreen();
-			break;
-		case 127:
-			if(whichDisplayType < 2)
+			if(isFullscreen == true)
 			{
-				whichDisplayType++;
+				glutReshapeWindow(800, 450);
+				glutPositionWindow(50,50);
+				pixelRatio = (float)800/450;
+				isFullscreen = false;
 			}
 			else
 			{
-				whichDisplayType = 0;
+				glutFullScreen();
+				isFullscreen = true;
 			}
+			break;
+		case 127:
+			setScreenSize();
 			break;
 
 		default :  printf ("   key = %c -> %d\n", key, key);
@@ -832,10 +885,11 @@ void keyboard (unsigned char key, int x, int y) {
 
 void display()
 {
-	float nearPlane = .1+ofTesting;
-    glClear(GL_COLOR_BUFFER_BIT|GL_DEPTH_BUFFER_BIT);
+	float nearPlane = .1;
     glMatrixMode(GL_MODELVIEW);
 	glLoadIdentity();   
+	glEnable(GL_NORMALIZE);
+	glClear(GL_COLOR_BUFFER_BIT|GL_DEPTH_BUFFER_BIT|GL_ACCUM_BUFFER_BIT|GL_STENCIL_BUFFER_BIT);
 	for(int i = 0; i < 2; i++)
 	{
 		if(sensor)
@@ -868,12 +922,12 @@ void display()
 			if(isRightEye) //Draw Which Eye
 			{
 				glDrawBuffer(GL_BACK_LEFT);
-				glClear(GL_COLOR_BUFFER_BIT|GL_DEPTH_BUFFER_BIT);
+				glClear(GL_COLOR_BUFFER_BIT|GL_DEPTH_BUFFER_BIT|GL_ACCUM_BUFFER_BIT|GL_STENCIL_BUFFER_BIT);
 			}
 			else //Draw Other Eye
 			{
 				glDrawBuffer(GL_BACK_RIGHT);
-				glClear(GL_COLOR_BUFFER_BIT|GL_DEPTH_BUFFER_BIT);
+				glClear(GL_COLOR_BUFFER_BIT|GL_DEPTH_BUFFER_BIT|GL_ACCUM_BUFFER_BIT|GL_STENCIL_BUFFER_BIT);
 			}
 		}
 		else if (whichDisplayType == 1)
@@ -907,12 +961,36 @@ void display()
 
 		glPushMatrix();
 			//Draw Scene
-			//spheres();
-			//scene();	
+		if(drawSceneOne)
+		{
+			scene();	
+		}
+		// Translations
+		glTranslatef(xpos, ypos, zpos);
+	
+		// Rotations
+		glRotatef(zrot, 0,0,1);        
+		glRotatef(yrot, 0,1,0);
+		glRotatef(xrot, 1,0,0);
+
+		glScalef(scale, scale, scale);
+
+		
+		//glMaterialfv(GL_FRONT_AND_BACK, GL_SPECULAR, white);
+		//glMaterialf(GL_FRONT_AND_BACK, GL_SHININESS, 20);
+
+		if(drawSceneTwo)
+		{
+			spheres();
+		}
+		if(drawSceneThree)
+		{
 			drawMesh();
+		}
+
 		glPopMatrix();
 
-
+		
 		
 		string framerate =  std::to_string(static_cast<long long>(fps));
 		glMatrixMode(GL_PROJECTION);
@@ -933,10 +1011,8 @@ void display()
 			worldHeadLoc[Y] = 38*ofTesting1;
 			worldHeadLoc[Z] = 243*ofTesting1;
 		}
-		glFrustum(nearPlane*(-screenWidthCm - worldHeadLoc[X]/1)/worldHeadLoc[Z], nearPlane*(screenWidthCm - worldHeadLoc[X]/1)/worldHeadLoc[Z], nearPlane*(-screenHeightCm - worldHeadLoc[Y]/1)/worldHeadLoc[Z], nearPlane*(screenHeightCm - worldHeadLoc[Y]/1)/worldHeadLoc[Z], nearPlane, 200000.0);
+		glFrustum(nearPlane*(-screenWidthCm - worldHeadLoc[X]/ofTesting)/worldHeadLoc[Z], nearPlane*(screenWidthCm - worldHeadLoc[X]/ofTesting)/worldHeadLoc[Z], nearPlane*(-screenHeightCm - worldHeadLoc[Y]/ofTesting)/worldHeadLoc[Z], nearPlane*(screenHeightCm - worldHeadLoc[Y]/ofTesting)/worldHeadLoc[Z], nearPlane, 200000.0);
 		gluLookAt(worldHeadLoc[X], worldHeadLoc[Y], worldHeadLoc[Z], worldHeadLoc[X], worldHeadLoc[Y], 0, 0, 1, 0);
-		
-		isRightEye = !isRightEye;
 	
 		if(drawCenter)
 		{
@@ -958,52 +1034,42 @@ void display()
 
 				glutBitmapCharacter(GLUT_BITMAP_TIMES_ROMAN_24, framerate[i]);
 			}
-		}
-		if(leftRightToggle)
-		{
-			if(i==0)
+			if(leftRightToggle)
 			{
-				if(!invertEyes)
+				if(isRightEye)
 				{
-					glColor3f(1.0, 0.0, 0.0);	
-					glRasterPos3f(screenWidthCm - (screenWidthCm/8),-screenHeightCm+(screenHeightCm/8),0);
-					glutBitmapCharacter(GLUT_BITMAP_TIMES_ROMAN_24, 'r');
-			
+					if(!invertEyes)
+					{
+						glColor3f(0.0, 0.0, 1.0);	
+						glRasterPos3f(-screenWidthCm + (screenWidthCm/8),-screenHeightCm+(screenHeightCm/8),0);
+						glutBitmapCharacter(GLUT_BITMAP_TIMES_ROMAN_24, 'l');			
+					}
+					else
+					{	
+						glRasterPos3f(screenWidthCm - (screenWidthCm/8),-screenHeightCm+(screenHeightCm/8),0);
+						glutBitmapCharacter(GLUT_BITMAP_TIMES_ROMAN_24, 'r');
+					}
+
 				}
 				else
 				{
-					glColor3f(0.0, 0.0, 1.0);	
-					glRasterPos3f(-screenWidthCm + (screenWidthCm/8),-screenHeightCm+(screenHeightCm/8),0);
-					glutBitmapCharacter(GLUT_BITMAP_TIMES_ROMAN_24, 'l');
-				}
+					if(!invertEyes)
+					{
+						glColor3f(1.0, 0.0, 0.0);	
+						glRasterPos3f(screenWidthCm - (screenWidthCm/8),-screenHeightCm+(screenHeightCm/8),0);
+						glutBitmapCharacter(GLUT_BITMAP_TIMES_ROMAN_24, 'r');			
+					}
+					else
+					{
+						glColor3f(0.0, 0.0, 1.0);	
+						glRasterPos3f(-screenWidthCm + (screenWidthCm/8),-screenHeightCm+(screenHeightCm/8),0);
+						glutBitmapCharacter(GLUT_BITMAP_TIMES_ROMAN_24, 'l');
 
-			}
-			else
-			{
-				if(!invertEyes)
-				{
-					glColor3f(0.0, 0.0, 1.0);	
-					glRasterPos3f(-screenWidthCm + (screenWidthCm/8),-screenHeightCm+(screenHeightCm/8),0);
-					glutBitmapCharacter(GLUT_BITMAP_TIMES_ROMAN_24, 'l');
-			
-				}
-				else
-				{
-					glColor3f(1.0, 0.0, 0.0);
-					glRasterPos3f(screenWidthCm - (screenWidthCm/8),-screenHeightCm+(screenHeightCm/8),0);
-					glutBitmapCharacter(GLUT_BITMAP_TIMES_ROMAN_24, 'r');
+					}
 				}
 			}
+			isRightEye = !isRightEye;
 		}
-		// Translations
-		glTranslatef(xpos, ypos, zpos);
-	
-		// Rotations
-		glRotatef(zrot, 0,0,1);        
-		glRotatef(yrot, 0,1,0);
-		glRotatef(xrot, 1,0,0);
-
-		glScalef(scale, scale, scale);
 	}
 	glutSwapBuffers();
     calculateFPS();
@@ -1017,7 +1083,6 @@ void reshape(int w, int h)
 	pixelRatio = (float)w/h;
 }
 
-
 //get it all up and ready at start
 void init()
 {
@@ -1026,9 +1091,13 @@ void init()
 	glColor3f(0.0, 0.0, 0.0);
 }
 
+
 //get window size, position, and start the functions to draw it all 
 int main(int argc, char** argv)
 {
+	setScreenSize();
+	
+
 	cout << "Loading Kinect \n";
 	initKinect();
 	if(!sensor)
@@ -1043,16 +1112,18 @@ int main(int argc, char** argv)
 		glutInitDisplayMode(GLUT_RGB|GLUT_DEPTH|GLUT_DOUBLE|GLUT_STEREO);
 		glutInitWindowSize(800, 450);
 		pixelRatio = (float)800/450;
-		glutInitWindowPosition(0, 0);
+		glutInitWindowPosition(50, 50);
 		glutCreateWindow("Kinect Headtracking OpenGL");
 		glutDisplayFunc(display);
-		glutIdleFunc(display); //To limit to whenever kinect is ready set to getSkeletonData
 		glutReshapeFunc(reshape);
 		glutKeyboardFunc(keyboard);
-	
+		glutIdleFunc(display); //To limit to when kinect is ready set to getSkeletonData
+
+		
 		init();
 		initTexturesBmp("textures\\bay\\bayScene");
-		initMesh("meshes\\xyzrgb_statuette_simplify.ply", 9, 15.5, 8, 5, -5.35, 17, 0, 0, 0);
+		//initMesh("meshes\\xyzrgb_statuette_simplify.ply", 9, 15.5, 8, 5, -5.35, 17, 0, 0, 0);
+		initMesh("meshes\\xyzrgb_statuette_simplify.ply", 30, 60, 30, 0, 0, 0, 90, 0, 0);
 	}
 	catch(exception e)
 	{
@@ -1074,6 +1145,6 @@ int main(int argc, char** argv)
 	{
 		cout << "Stereo ready card not detected :(" << endl;
 	}
-
+	initCompleted = true;
 	glutMainLoop();   
 }
