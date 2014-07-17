@@ -7,6 +7,9 @@
 #include <Windows.h>
 #include <Ole2.h>
 
+//GL extension wrangler things
+#include <GL/glew.h>
+
 //GLUT and OpenGL things
 #include <gl/GL.h>
 #include <gl/GLU.h>
@@ -23,25 +26,29 @@
 #include <string>
 using namespace std;
 
-const int BLURFREQUENCY = 0;
-const int TEXTURECOUNT = 1;
-const double PI = 3.14159265358979323846;
+//TODO:
+	//Import start vars from file
+
+const int BLURFREQUENCY = 0;	//Set how many partial transitions between each texture update (unfinished)
+const int TEXTURECOUNT = 40;
+//How many texture files to load (recently untested)
+const double PI = 3.14159265358979323846;	//PI for when needed (currently unused)
 
 //Collab 4K tv 142.3 cm Width 80.5 Height
 //Laptop 34.5 cm Width 19.5 Height
 //Asus 3D Display 60.2 cm Width 34.2 cm Height
 
-//In centimeters
-const float screenWidthCmActive = 60.2/2;
+//In centimeters, Active display can now have seperate display demensions from passive
+const float screenWidthCmActive = 60.2/2; 
 const float screenHeightCmActive = 34.2/2;
 
 const float screenWidthCmPassive = 142.3/2;
 const float screenHeightCmPassive = 80.5/2;
-
-float screenWidthCm = 0.0;
+//Var to store current used screen demensions
+float screenWidthCm = 0.0; //Remember these values should be half of whatever the width or height is
 float screenHeightCm = 0.0;
 
-const int BMPHEADERSIZE = 54;
+const int BMPHEADERSIZE = 54; //by default this is how large the header in BMPs
 
 //Some consts for better readability of code when using arrays
 const int X = 0;
@@ -67,10 +74,16 @@ float worldHeadLoc[3];
 
 
 //Texture Importer Vars
-int textureWidth[TEXTURECOUNT];
-int textureHeight[TEXTURECOUNT];
-char * textureData[TEXTURECOUNT];
-GLuint textureID[TEXTURECOUNT];
+GLuint textureID2D[TEXTURECOUNT];
+int textureWidth2D[TEXTURECOUNT];
+int textureHeight2D[TEXTURECOUNT];
+char * textureData2D[TEXTURECOUNT];
+
+GLuint textureID3D;
+char * textureData3D;
+int textureWidth3D;
+int textureHeight3D;
+
 int textureToLoad = 0;
 int blendsTillTexture = 0;
 
@@ -110,7 +123,7 @@ GLfloat ambientLight[]    = {0.2, 0.2, 0.2, 1.0};
 GLfloat diffuseLight[]    = {0.5, 0.5, 0.5, 1.0};
 GLfloat specularLight[]    = {0.2, 0.2, 0.2, 1.0};
 
-GLfloat lightPosition[] = {0, 0, 0, 0};
+GLfloat lightPosition[] = {0, 0, 0, 0}; //Now set in code so that light updates to current screen (Fix to be same distance from model)
 
 
 //Kinect Vars
@@ -121,59 +134,76 @@ float kinectOffsetCm[3] = {0,0,0};
 
 
 //Generic Vars
+
+//Bools
 bool infoToggle = false;
-bool yzTracking = false;
+bool yzTracking = true;
 bool drawCenter = false;
 bool kinectToggle = true;
-bool fpsToggle = true;
+bool hudToggle = true;
 int whichDisplayType = 0;
 bool leftRightToggle = true;
 bool invertEyes = false;
 bool isFullscreen = false;
 bool initCompleted = false;
+
 //Window Vars
 int pixelWidth;
 int pixelHeight;
 float pixelRatio;
+
 //FPS Vars
 int frameCount = 0;
 int fps = 0;
-float currentTime = 0.0;
 float previousTime = 0.0;
+
 //3D Display Vars
 float eyeDistCm = 8.0/2;
-bool isRightEye = false;
+bool isFirstEye = false;
+
 //Debug Vars
 float ofTesting = 1;
-float ofTesting1 = 1;
+float ofTesting1 = 0;
 float ofTesting2 = 0;
+float xMoveAmount = -50;
+
 //Scene Vars
-bool drawSceneOne = true;
-bool drawSceneTwo = true;
-bool drawSceneThree = false;
+bool drawSceneOne = false;
+bool drawSceneTwo = false;
+bool drawSceneThree = true;
+
+//Pic chosen Vars
+float picDistAbs = 100;
+float picInterval = picDistAbs / TEXTURECOUNT;
+bool invertImages = false;
 
 bool initKinect() 
 {
     // Get a working kinect sensor
     int numSensors;
-    if (NuiGetSensorCount(&numSensors) < 0 || numSensors < 1) return false;
-    if (NuiCreateSensorByIndex(0, &sensor) < 0) return false;
-
+    if (NuiGetSensorCount(&numSensors) < 0 || numSensors < 1) 
+	{
+		return false; //If no sensor return false (No kinect found/ready)
+	}
+    if (NuiCreateSensorByIndex(0, &sensor) < 0) 
+	{
+		return false; //If sensor not index return false (No kinect found/ready)
+	}
     // Initialize sensor
     sensor->NuiInitialize(NUI_INITIALIZE_FLAG_USES_SKELETON);
-    sensor->NuiImageStreamOpen(NUI_IMAGE_TYPE_DEPTH_AND_PLAYER_INDEX, // Depth camera
-        NUI_IMAGE_RESOLUTION_80x60,                // Image resolution
-        0,        // Image stream flags, e.g. near mode
-        0,        // Number of frames to buffer
-        NULL,     // Event handle
+    sensor->NuiImageStreamOpen(NUI_IMAGE_TYPE_DEPTH_AND_PLAYER_INDEX,	// Depth camera
+        NUI_IMAGE_RESOLUTION_80x60,									    // Image resolution (Low resolution test since it seems to work as well but need to test latency)
+        0,																// Image stream flags, e.g. near mode
+        0,																// Number of frames to buffer
+        NULL,															// Event handle
         &depthStream);
-	sensor->NuiSkeletonTrackingEnable(NULL, NUI_SKELETON_TRACKING_FLAG_ENABLE_SEATED_SUPPORT); // NUI_SKELETON_TRACKING_FLAG_ENABLE_SEATED_SUPPORT for only upper body
+	sensor->NuiSkeletonTrackingEnable(NULL, NUI_SKELETON_TRACKING_FLAG_ENABLE_SEATED_SUPPORT); //Assume person is sitting/Only track upper body
     return true;
 }
 
 void getSkeletalData() 
 {	
- 	if(sensor)
+ 	if(sensor) //Prevent crashes
 	{
 		NUI_SKELETON_FRAME skeletonFrame = {0};
 		if (sensor->NuiSkeletonGetNextFrame(0, &skeletonFrame) >= 0) 
@@ -192,8 +222,8 @@ void getSkeletalData()
 					{
 						skeletonPosition[NUI_SKELETON_POSITION_HEAD].w = 0;
 					}
-					//glutPostRedisplay();
-					return; // Only take the data for one skeleton
+					//glutPostRedisplay(); //Comment out to get updates as fast as possible instead of synced with the kinect (Also set display as idle function)
+					return; // Only take the data for first skeleton
 				}
 			}
 		}
@@ -202,55 +232,134 @@ void getSkeletalData()
 
 void initTexturesBmp(string baseFileName)
 {
-	//Load in all the textures
-	while(textureToLoad < TEXTURECOUNT)
+	if(glewIsSupported("GL_VERSION_1_4"))
 	{
+		cout << "3D textures supported :)" << endl; 
+
 		char header[BMPHEADERSIZE]; //How large the header should be in a bmp
-		int dataPos; //Where the image starts     
-		int imageSize; //How many pixels are there
 
+		int imageSize3D =TEXTURECOUNT;
 
-		string fileName = baseFileName + " (" + std::to_string(static_cast<long long>(textureToLoad+1)) + ").bmp";	//Take the base image name and add on the counting system which is image (x+1).bmp (Easy to rename on widows like that
-		//Right now this is hard coded until I can figure out a platform agnostic way to programatically get the name of every image in a folder		
-
- 		FILE * file = fopen(fileName.c_str(),"rb"); //Convert string to char and open it Using fopen since openGL expects char* not strings
-		if (!file)
+		while(textureToLoad < TEXTURECOUNT)
 		{
-			//File could not be found
-			cout << "Image could not be found/opened" << endl;; 
-			system("pause");
-			exit(0);
-		}
-		if (fread(header, 1, 54, file)!=54 ||  header[0]!='B' || header[1]!='M' )
-		{
-			cout << "BMP file is not formated correctly" << endl;
-			system("pause");
-			exit(0);
-		}
-		dataPos    = *(int*)&(header[0x0A]);
-		imageSize  = *(int*)&(header[0x22]);
-		textureWidth[textureToLoad]      = *(int*)&(header[0x12]);
-		textureHeight[textureToLoad]     = *(int*)&(header[0x16]);
+			string fileName = baseFileName + " (" + std::to_string(static_cast<long long>(textureToLoad+1)) + ").bmp";	//Take the base image name and add on the counting system which is image (x+1).bmp (Easy to rename on widows like that
+			//Right now this is hard coded until I can figure out a platform agnostic way to programatically get the name of every image in a folder		
 
-		textureData[textureToLoad] = new char [imageSize]; //Where the data for each image will be stored allocate for current image size (Jagged Array)
- 
-		fseek(file, dataPos-BMPHEADERSIZE, SEEK_CUR);
-		fread(textureData[textureToLoad],1,imageSize,file); //Load in the data from the image to appropriate array location
- 
-		fclose(file); //Clean up unneeded resources
+ 			FILE * file = fopen(fileName.c_str(),"rb"); //Convert string to char and open it Using fopen since openGL expects char* not strings
+			if (!file)
+			{
+				//File could not be found
+				cout << "Image could not be found/opened" << endl;; 
+				system("pause");
+				exit(0);
+			}
+			if (fread(header, 1, 54, file)!=54 ||  header[0]!='B' || header[1]!='M' )
+			{
+				cout << "BMP file is not formated correctly" << endl;
+				system("pause");
+				exit(0);
+			}
 
-		glGenTextures(1, &textureID[textureToLoad]);
+			int dataPos    = *(int*)&(header[0x0A]); //Dont assume headers all same size
+			int imageSize2D  = *(int*)&(header[0x22]);
+		
+			if(textureToLoad == 0)
+			{
+				imageSize3D *= *(int*)&(header[0x22]);
+				textureWidth3D = *(int*)&(header[0x12]);
+				textureHeight3D = *(int*)&(header[0x16]);
+
+				textureData3D = new char [imageSize3D]; //Where the data for each image will be stored allocate for current image size (Non-Jagged Array assumes images all same size)
+			}
+ 
+			fseek(file, dataPos-BMPHEADERSIZE, SEEK_CUR);
+			char *textureDataTemp = new char [imageSize2D];
+			fread(textureDataTemp,1,imageSize2D,file); //Load in the data from the image to appropriate array location
+
+			cout << (sizeof(textureDataTemp)/sizeof(*textureDataTemp)) <<endl;
+			cout << (sizeof(*textureDataTemp)) <<endl;
+			cout << (sizeof(textureDataTemp))<<endl;
+
+			for(int i = 0; i < ((sizeof(textureDataTemp)/sizeof(*textureDataTemp))); i++)
+			{
+				textureData3D[i+(textureToLoad*(sizeof(textureDataTemp)/sizeof(*textureDataTemp)))] = textureDataTemp[i];
+			}
+			fclose(file); //Clean up unneeded resources
+			textureToLoad++;
+		}
+		glPixelStorei(GL_UNPACK_ALIGNMENT,1);
+		glGenTextures(1, &textureID3D);
 
  
 		textureToLoad++;
 		cout << "Texture Number: " << textureToLoad << endl;
+
+		/*GLubyte* pVolume=new GLubyte[size];
+		fread(pVolume,sizeof(GLubyte),size,pFile);
+		fclose(pFile);
+		glPixelStorei(GL_UNPACK_ALIGNMENT,1);
+		glGenTextures(1, &volume_texture);
+
+
+
+		delete []pVolume;
+		cout << "volume texture created" << endl;
+		*/
 	}
-	textureToLoad = 0;
+	else
+	{
+		cout << "3D textures not supported :(" << endl; 
+		//Load in all the textures
+		while(textureToLoad < TEXTURECOUNT)
+		{
+			char header[BMPHEADERSIZE]; //How large the header should be in a bmp
+			int dataPos; //Where the image starts     
+			int imageSize; //How many pixels are there
+
+
+			string fileName = baseFileName + " (" + std::to_string(static_cast<long long>(textureToLoad+1)) + ").bmp";	//Take the base image name and add on the counting system which is image (x+1).bmp (Easy to rename on widows like that
+			//Right now this is hard coded until I can figure out a platform agnostic way to programatically get the name of every image in a folder		
+
+ 			FILE * file = fopen(fileName.c_str(),"rb"); //Convert string to char and open it Using fopen since openGL expects char* not strings
+			if (!file)
+			{
+				//File could not be found
+				cout << "Image could not be found/opened" << endl;; 
+				system("pause");
+				exit(0);
+			}
+			if (fread(header, 1, 54, file)!=54 ||  header[0]!='B' || header[1]!='M' )
+			{
+				cout << "BMP file is not formated correctly" << endl;
+				system("pause");
+				exit(0);
+			}
+			dataPos    = *(int*)&(header[0x0A]);
+			imageSize  = *(int*)&(header[0x22]);
+			textureWidth2D[textureToLoad]      = *(int*)&(header[0x12]);
+			textureHeight2D[textureToLoad]     = *(int*)&(header[0x16]);
+
+			textureData2D[textureToLoad] = new char [imageSize]; //Where the data for each image will be stored allocate for current image size (Jagged Array)
+ 
+			fseek(file, dataPos-BMPHEADERSIZE, SEEK_CUR);
+			fread(textureData2D[textureToLoad],1,imageSize,file); //Load in the data from the image to appropriate array location
+			cout << sizeof(textureData2D[textureToLoad]);
+			fclose(file); //Clean up unneeded resources
+			
+			glPixelStorei(GL_UNPACK_ALIGNMENT,1);
+			glGenTextures(1, &textureID2D[textureToLoad]);
+
+ 
+			textureToLoad++;
+			cout << "Texture Number: " << textureToLoad << endl;
+		}
+		textureToLoad = 0;
+	}
 }
 
 float* calculateNormal( float *coord1, float *coord2, float *coord3 )
 {
-   /* calculate Vector1 and Vector2 */
+   //calculate Vector1 and Vector2
    float va[3], vb[3], vr[3], val;
    va[0] = coord1[0] - coord2[0];
    va[1] = coord1[1] - coord2[1];
@@ -260,12 +369,12 @@ float* calculateNormal( float *coord1, float *coord2, float *coord3 )
    vb[1] = coord1[1] - coord3[1];
    vb[2] = coord1[2] - coord3[2];
  
-   /* cross product */
+   //cross product
    vr[0] = va[1] * vb[2] - vb[1] * va[2];
    vr[1] = vb[0] * va[2] - va[0] * vb[2];
    vr[2] = va[0] * vb[1] - vb[0] * va[1];
  
-   /* normalization factor */
+   //normalization factor
    val = sqrt( vr[0]*vr[0] + vr[1]*vr[1] + vr[2]*vr[2] );
  
 	float norm[3];
@@ -410,18 +519,11 @@ void initMesh(char* filename, float meshScaleX, float meshScaleY, float meshScal
 		{
  
 			int vertex1 = 0, vertex2 = 0, vertex3 = 0;
-			//sscanf(buffer,"%i%i%i\n", vertex1,vertex2,vertex3 );
 			buffer[0] = ' ';
 			sscanf(buffer,"%i%i%i", &vertex1,&vertex2,&vertex3 );
-			/*vertex1 -= 1;
-			vertex2 -= 1;
-			vertex3 -= 1;
-			*/
-			//  vertex == punt van vertex lijst
-			// vertex_buffer -> xyz xyz xyz xyz
-			//printf("%f %f %f ", Vertex_Buffer[3*vertex1], Vertex_Buffer[3*vertex1+1], Vertex_Buffer[3*vertex1+2]);
 
 			//+((-meshSize[X]/2)-abs(boundingBox[X+MIN]))) possible pos change to get centered with point 0,0,0
+
 			faces_Triangles[triangle_index]   = (vertex_Buffer[3*vertex1+X])*(meshScaleX/meshSize[X]);
 			faces_Triangles[triangle_index+1] = (vertex_Buffer[3*vertex1+Y])*(meshScaleY/meshSize[Y]);
 			faces_Triangles[triangle_index+2] = (vertex_Buffer[3*vertex1+Z])*(meshScaleZ/meshSize[Z]);
@@ -464,6 +566,7 @@ void drawMesh()
 {
 	glPushMatrix();	
 
+	//Move and rotate object as requested
 	glRotatef(meshxrot, 1, 0, 0);
 	glRotatef(meshyrot, 0, 1, 0);
 	glRotatef(meshzrot, 0, 0, 1);
@@ -478,7 +581,7 @@ void drawMesh()
 	
 	glLightfv(GL_LIGHT0, GL_POSITION, lightPosition);
 	
-	if(isRightEye) //Allow for different collor for each eye for testing
+	if(isFirstEye) //Allow for different color for each eye for testing
 	{
 		glMaterialfv(GL_FRONT_AND_BACK, GL_AMBIENT, red);
 		glMaterialfv(GL_FRONT_AND_BACK, GL_DIFFUSE, red);
@@ -489,7 +592,7 @@ void drawMesh()
 		glMaterialfv(GL_FRONT_AND_BACK, GL_DIFFUSE, red);
 	}
 
-	glColor3f(1.0,1.0,1.0);
+	//Draw mesh
 	glEnableClientState(GL_VERTEX_ARRAY);	
  	glEnableClientState(GL_NORMAL_ARRAY);
 	glVertexPointer(3,GL_FLOAT,	0,faces_Triangles);	
@@ -508,7 +611,7 @@ void drawMesh()
 void spheres()
 {
 	glPushMatrix();
-	glTranslatef(0,0,-screenHeightCm + 4*screenHeightCm);
+	glTranslatef(0,0,-screenHeightCm); //Draw blue centered instead of green
 
 	glEnable(GL_LIGHTING);
 	glEnable(GL_LIGHT0);
@@ -524,7 +627,7 @@ void spheres()
 	glPushMatrix();
 		glColor3f(0.0, 1.0, 0.0); //wanted center of projection green sphere
 		glTranslatef (0.0, 0.0, 0.0);
-		glutSolidSphere(1*screenHeightCm/8, 100, 100);
+		glutSolidSphere(1*screenHeightCm/8, 25, 25);
 	glPopMatrix();
 
 	glMaterialfv(GL_FRONT_AND_BACK, GL_AMBIENT, blue);
@@ -532,7 +635,7 @@ void spheres()
 	glPushMatrix();
 		glColor3f(0.0, 0.0, 1.0); //blue
 		glTranslatef (0.0, 0.0, screenHeightCm);
-		glutSolidSphere(1*screenHeightCm/8, 100, 100);
+		glutSolidSphere(1*screenHeightCm/8, 25, 25);
 	glPopMatrix();
 
 	glMaterialfv(GL_FRONT_AND_BACK, GL_AMBIENT, orange);
@@ -540,7 +643,7 @@ void spheres()
 	glPushMatrix();
 		glColor3f(1.0, 0.5, 0.0); //orange
 		glTranslatef (.0, 0.0, -screenHeightCm);
-		glutSolidSphere(1*screenHeightCm/8, 100, 100);
+		glutSolidSphere(1*screenHeightCm/8, 25, 25);
 	glPopMatrix();
 
 	glMaterialfv(GL_FRONT_AND_BACK, GL_AMBIENT, purple);
@@ -548,7 +651,7 @@ void spheres()
 	glPushMatrix();
 		glColor3f(0.5, 0.0, 0.5); //purple
 		glTranslatef (screenHeightCm, 0.0, 0.0);
-		glutSolidSphere(1*screenHeightCm/8, 100, 100);
+		glutSolidSphere(1*screenHeightCm/8, 25, 25);
 	glPopMatrix();
 	
 	glMaterialfv(GL_FRONT_AND_BACK, GL_AMBIENT, black);
@@ -556,7 +659,7 @@ void spheres()
 	glPushMatrix();
 		glColor3f(0.0, 0.0, 0.0); //black
 		glTranslatef (-screenHeightCm, 0.0, 0.0); 
-		glutSolidSphere(1*screenHeightCm/8, 100, 100);
+		glutSolidSphere(1*screenHeightCm/8, 25, 25);
 	glPopMatrix();   
 
 	glMaterialfv(GL_FRONT_AND_BACK, GL_AMBIENT, red);
@@ -564,138 +667,219 @@ void spheres()
 	glPushMatrix();
 		glColor3f(1.0, 0.0, 0.0); //red
 		glTranslatef (0.0, 0.0, 2* screenHeightCm); 
-		glutSolidSphere(1*screenHeightCm/8, 100, 100);
+		glutSolidSphere(1*screenHeightCm/8, 25, 25);
 	glPopMatrix();   
 	glDisable(GL_LIGHTING);
 	glDisable(GL_LIGHT0);
 	glPopMatrix(); 
 }
 
-void scene()
+void texBox()
 {
 	glPushMatrix();
-	glTranslatef(0,0,-screenHeightCm);
-	glEnable(GL_TEXTURE_2D);
+	glTranslatef(0,0,2*screenHeightCm); //Set to end at screen
 
-	glTexImage2D(GL_TEXTURE_2D, 0,GL_RGB, textureWidth[textureToLoad], textureHeight[textureToLoad], 0, GL_BGR_EXT, GL_UNSIGNED_BYTE, textureData[textureToLoad]);
-
-	glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
-	glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
-	glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
-	glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
-
-	glBegin(GL_QUADS); //Bottom
-		glColor3f(1.0,1.0,1.0);
-		glNormal3d(0, 1, 0); 
-		glTexCoord2f(5.0,5.0);		glVertex3f( screenWidthCm,-screenHeightCm, screenHeightCm);  
-		glTexCoord2f(-5.0,5.0);		glVertex3f( screenWidthCm,-screenHeightCm,-2*screenHeightCm);
-		glTexCoord2f(-5.0,-5.0);	glVertex3f(-screenWidthCm,-screenHeightCm,-2*screenHeightCm);
-		glTexCoord2f(5.0,-5.0);		glVertex3f(-screenWidthCm,-screenHeightCm, screenHeightCm);
-    glEnd();
-	glBegin(GL_QUADS);//Left
-		glColor3f(1.0,1.0,1.0);
-		glNormal3d(1, 0, 0);
-		glTexCoord2f(-5.0,-5.0);	glVertex3f(-screenWidthCm,-screenHeightCm,-2*screenHeightCm);
-		glTexCoord2f(-5.0,5.0);		glVertex3f(-screenWidthCm, screenHeightCm,-2*screenHeightCm); 
-		glTexCoord2f(5.0,5.0);		glVertex3f(-screenWidthCm, screenHeightCm, screenHeightCm);  
-		glTexCoord2f(5.0,-5.0);		glVertex3f(-screenWidthCm,-screenHeightCm, screenHeightCm);
-    glEnd();
-	glBegin(GL_QUADS);//Right
-		glColor3f(1.0,1.0,1.0);
-		glNormal3d(-1, 0, 0); 
-		glTexCoord2f(5.0,-5.0);		glVertex3f(screenWidthCm,-screenHeightCm, screenHeightCm);
-		glTexCoord2f(5.0,5.0);		glVertex3f(screenWidthCm, screenHeightCm, screenHeightCm);
-		glTexCoord2f(-5.0,5.0);		glVertex3f(screenWidthCm, screenHeightCm,-2*screenHeightCm);
-		glTexCoord2f(-5.0,-5.0);	glVertex3f(screenWidthCm,-screenHeightCm,-2*screenHeightCm);
-    glEnd();
-	glBegin(GL_QUADS);//Top
-		glColor3f(1.0,1.0,1.0);
-		glNormal3d(0, -1, 0);
-		glTexCoord2f(-5.0,5.0);		glVertex3f( screenWidthCm,screenHeightCm,-2*screenHeightCm); 
-		glTexCoord2f(5.0,5.0);		glVertex3f( screenWidthCm,screenHeightCm, screenHeightCm);  
-		glTexCoord2f(5.0,-5.0);		glVertex3f(-screenWidthCm,screenHeightCm, screenHeightCm);
-		glTexCoord2f(-5.0,-5.0);	glVertex3f(-screenWidthCm,screenHeightCm,-2*screenHeightCm);
-    glEnd();
-	glBegin(GL_QUADS); //Back
-		glColor3f(1.0,1.0,1.0);
-		glNormal3d(0, 0, 1);
-		glTexCoord2f(1,-0);		glVertex3f( screenWidthCm,-screenHeightCm,-2*screenHeightCm); 
-		glTexCoord2f(1,1);		glVertex3f( screenWidthCm, screenHeightCm,-2*screenHeightCm);  
-		glTexCoord2f(-0,1);		glVertex3f(-screenWidthCm, screenHeightCm,-2*screenHeightCm);
-		glTexCoord2f(-0,-0);	glVertex3f(-screenWidthCm,-screenHeightCm,-2*screenHeightCm);
-    glEnd();
-
-	if(blendsTillTexture == BLURFREQUENCY)
+	//Temporary fix to the eyes being in the wrong order for images
+	if(isFirstEye) //Assumes point given by the kinect is perfectly in between two eyes
 	{
-		//cout << "Dont do blend " << textureToLoad << endl;
-		blendsTillTexture = 0;
-
-		textureToLoad ++;
+		worldHeadLoc[X] -= 2*eyeDistCm;
 	}
 	else
 	{
-		glEnable(GL_BLEND);
-		//glBlendFunc(GL_ONE_MINUS_DST_COLOR, GL_ONE_MINUS_SRC_COLOR);
-		//glBlendFunc(GL_SRC_COLOR, GL_DST_COLOR);
-		//glBlendFunc(GL_ONE, GL_ONE_MINUS_SRC_COLOR);
-		//glBlendFunc(GL_SRC_COLOR ,GL_ONE_MINUS_SRC_COLOR );
-		glBlendFunc(GL_ONE, GL_ONE);
+		worldHeadLoc[X] += 2*eyeDistCm;
+	}
+	
 
-		glTexImage2D(GL_TEXTURE_2D, 0,GL_RGB, textureWidth[textureToLoad-1], textureHeight[textureToLoad-1], 0, GL_BGR_EXT, GL_UNSIGNED_BYTE, textureData[textureToLoad-1]);
+	if(glewIsSupported("GL_VERSION_1_4"))
+	{
+		glEnable(GL_TEXTURE_3D);
+		glBindTexture(GL_TEXTURE_3D, textureID3D);
+		glTexEnvi(GL_TEXTURE_ENV, GL_TEXTURE_ENV_MODE, GL_REPLACE);
+		glTexParameteri(GL_TEXTURE_3D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+		glTexParameteri(GL_TEXTURE_3D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+		glTexParameteri(GL_TEXTURE_3D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_BORDER);
+		glTexParameteri(GL_TEXTURE_3D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_BORDER);
+		glTexParameteri(GL_TEXTURE_3D, GL_TEXTURE_WRAP_R, GL_CLAMP_TO_BORDER);
+		glTexImage3D(GL_TEXTURE_3D, 0,GL_INTENSITY, textureWidth3D, textureHeight3D,TEXTURECOUNT,0, GL_LUMINANCE,GL_UNSIGNED_BYTE,textureData3D);
+
+		
 		glBegin(GL_QUADS); //Back
 			glColor3f(1.0,1.0,1.0);
-			glNormal3d(0, 0, 1);		
-			glTexCoord2f(1,-0);		glVertex3f( screenWidthCm,-screenHeightCm,-screenHeightCm+.01); 
-			glTexCoord2f(1,1);		glVertex3f( screenWidthCm, screenHeightCm,-screenHeightCm+.01);  
-			glTexCoord2f(-0,1);		glVertex3f(-screenWidthCm, screenHeightCm,-screenHeightCm+.01);
-			glTexCoord2f(-0,-0);	glVertex3f(-screenWidthCm,-screenHeightCm,-screenHeightCm+.01);
+			glNormal3d(0, 0, 1);
+			glTexCoord3f(1,-0,0);		glVertex3f( screenWidthCm,-screenHeightCm,-2*screenHeightCm+.01); 
+			glTexCoord3f(1,1,0);		glVertex3f( screenWidthCm, screenHeightCm,-2*screenHeightCm+.01);  
+			glTexCoord3f(-0,1,0);		glVertex3f(-screenWidthCm, screenHeightCm,-2*screenHeightCm+.01);
+			glTexCoord3f(-0,-0,0);	glVertex3f(-screenWidthCm,-screenHeightCm,-2*screenHeightCm+.01);
 		glEnd();
 
+	}
+	else
+	{
+		glEnable(GL_TEXTURE_2D);
 
-		//cout << "Do blend " << blendsTillTexture << endl;
-		blendsTillTexture ++;
+		glBindTexture(GL_TEXTURE_2D, textureID2D[textureToLoad]);
+		if(!invertImages)
+		{
+			if(worldHeadLoc[X] >= picDistAbs/2)
+			{
+				textureToLoad = picDistAbs / picInterval -1;
+			}
+			else if (worldHeadLoc[X] <= -picDistAbs/2)
+			{
+				textureToLoad = 0;
+			}
+			else
+			{
+				textureToLoad = ((picDistAbs/2) + worldHeadLoc[X]) / picInterval - 1;
+			}
+		}
+		else
+		{
+			if(worldHeadLoc[X] >= picDistAbs/2)
+			{
+				textureToLoad = 0;
+			}
+			else if (worldHeadLoc[X] <= -picDistAbs/2)
+			{
+				textureToLoad = picDistAbs / picInterval -1;
+			}
+			else
+			{
+				textureToLoad = (picDistAbs / picInterval -1) -(((picDistAbs/2) + worldHeadLoc[X]) / picInterval - 1);
+			}
+		}
+		glTexImage2D(GL_TEXTURE_2D, 0,GL_RGB, textureWidth2D[textureToLoad], textureHeight2D[textureToLoad], 0, GL_BGR_EXT, GL_UNSIGNED_BYTE, textureData2D[textureToLoad]);
+
+		glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
+		glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
+		glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+		glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+		/*
+		glBegin(GL_QUADS); //Bottom
+			glColor3f(1.0,1.0,1.0);
+			glNormal3d(0, 1, 0); 
+			glTexCoord2f(5.0,5.0);		glVertex3f( screenWidthCm,-screenHeightCm, screenHeightCm);  
+			glTexCoord2f(-5.0,5.0);		glVertex3f( screenWidthCm,-screenHeightCm,-2*screenHeightCm);
+			glTexCoord2f(-5.0,-5.0);	glVertex3f(-screenWidthCm,-screenHeightCm,-2*screenHeightCm);
+			glTexCoord2f(5.0,-5.0);		glVertex3f(-screenWidthCm,-screenHeightCm, screenHeightCm);
+		glEnd();
+		glBegin(GL_QUADS);//Left
+			glColor3f(1.0,1.0,1.0);
+			glNormal3d(1, 0, 0);
+			glTexCoord2f(-5.0,-5.0);	glVertex3f(-screenWidthCm,-screenHeightCm,-2*screenHeightCm);
+			glTexCoord2f(-5.0,5.0);		glVertex3f(-screenWidthCm, screenHeightCm,-2*screenHeightCm); 
+			glTexCoord2f(5.0,5.0);		glVertex3f(-screenWidthCm, screenHeightCm, screenHeightCm);  
+			glTexCoord2f(5.0,-5.0);		glVertex3f(-screenWidthCm,-screenHeightCm, screenHeightCm);
+		glEnd();
+		glBegin(GL_QUADS);//Right
+			glColor3f(1.0,1.0,1.0);
+			glNormal3d(-1, 0, 0); 
+			glTexCoord2f(5.0,-5.0);		glVertex3f(screenWidthCm,-screenHeightCm, screenHeightCm);
+			glTexCoord2f(5.0,5.0);		glVertex3f(screenWidthCm, screenHeightCm, screenHeightCm);
+			glTexCoord2f(-5.0,5.0);		glVertex3f(screenWidthCm, screenHeightCm,-2*screenHeightCm);
+			glTexCoord2f(-5.0,-5.0);	glVertex3f(screenWidthCm,-screenHeightCm,-2*screenHeightCm);
+		glEnd();
+		glBegin(GL_QUADS);//Top
+			glColor3f(1.0,1.0,1.0);
+			glNormal3d(0, -1, 0);
+			glTexCoord2f(-5.0,5.0);		glVertex3f( screenWidthCm,screenHeightCm,-2*screenHeightCm); 
+			glTexCoord2f(5.0,5.0);		glVertex3f( screenWidthCm,screenHeightCm, screenHeightCm);  
+			glTexCoord2f(5.0,-5.0);		glVertex3f(-screenWidthCm,screenHeightCm, screenHeightCm);
+			glTexCoord2f(-5.0,-5.0);	glVertex3f(-screenWidthCm,screenHeightCm,-2*screenHeightCm);
+		glEnd();*/
+		glBegin(GL_QUADS); //Back
+			glColor3f(1.0,1.0,1.0);
+			glNormal3d(0, 0, 1);
+			glTexCoord2f(1,-0);		glVertex3f( screenWidthCm,-screenHeightCm,-2*screenHeightCm+.01); 
+			glTexCoord2f(1,1);		glVertex3f( screenWidthCm, screenHeightCm,-2*screenHeightCm+.01);  
+			glTexCoord2f(-0,1);		glVertex3f(-screenWidthCm, screenHeightCm,-2*screenHeightCm+.01);
+			glTexCoord2f(-0,-0);	glVertex3f(-screenWidthCm,-screenHeightCm,-2*screenHeightCm+.01);
+		glEnd();
+
+		//Unfinished does not run if BLURFREQUENCY is set to 0 likely will be completely rewritten in the future
+		//Intended to be used later when real images are what is set to be displayed so we can get some interpolation
+		if(blendsTillTexture == BLURFREQUENCY)
+		{
+			//cout << "Dont do blend " << textureToLoad << endl;
+			blendsTillTexture = 0;
+
+			//textureToLoad ++;
+		}
+		else
+		{
+			glEnable(GL_BLEND);
+			//glBlendFunc(GL_ONE_MINUS_DST_COLOR, GL_ONE_MINUS_SRC_COLOR);
+			//glBlendFunc(GL_SRC_COLOR, GL_DST_COLOR);
+			//glBlendFunc(GL_ONE, GL_ONE_MINUS_SRC_COLOR);
+			//glBlendFunc(GL_SRC_COLOR ,GL_ONE_MINUS_SRC_COLOR );
+			glBlendFunc(GL_ONE, GL_ONE);
+
+			glTexImage2D(GL_TEXTURE_2D, 0,GL_RGB, textureWidth2D[textureToLoad-1], textureHeight2D[textureToLoad-1], 0, GL_BGR_EXT, GL_UNSIGNED_BYTE, textureData2D[textureToLoad-1]);
+			glBegin(GL_QUADS); //Back
+				glColor3f(1.0,1.0,1.0);
+				glNormal3d(0, 0, 1);		
+				glTexCoord2f(1,-0);		glVertex3f( screenWidthCm,-screenHeightCm,-screenHeightCm-.1); 
+				glTexCoord2f(1,1);		glVertex3f( screenWidthCm, screenHeightCm,-screenHeightCm-.1);  
+				glTexCoord2f(-0,1);		glVertex3f(-screenWidthCm, screenHeightCm,-screenHeightCm-.1);
+				glTexCoord2f(-0,-0);	glVertex3f(-screenWidthCm,-screenHeightCm,-screenHeightCm-.1);
+			glEnd();
+
+
+			//cout << "Do blend " << blendsTillTexture << endl;
+			blendsTillTexture ++;
 		
 
-	}	
+		}	
 
-	if(textureToLoad == TEXTURECOUNT)
-	{
-		textureToLoad = 0;
+		if(textureToLoad == TEXTURECOUNT)
+		{
+			textureToLoad = 0;
+		}
+
+		glDisable(GL_TEXTURE_2D);
+		glDisable(GL_BLEND);
 	}
-
-	glDisable(GL_TEXTURE_2D);
-	glDisable(GL_BLEND);
+	
 	glPopMatrix(); 
+	//Temporary until I reverse the image loader
+	if(isFirstEye) //Assumes point given by the kinect is perfectly in between two eyes
+	{
+		worldHeadLoc[X] += 2*eyeDistCm;
+	}
+	else
+	{
+		worldHeadLoc[X] -= 2*eyeDistCm;
+	}
 }
 
 void calculateFPS()
 {
-    //  Increase frame count
+    //Increase times frame has been updated
     frameCount++;
  
-    //  Get the number of milliseconds since glutInit called
-    //  (or first call to glutGet(GLUT ELAPSED TIME)).
-    currentTime = glutGet(GLUT_ELAPSED_TIME);
+    //Get the number of milliseconds since last called
+    float currentTime = glutGet(GLUT_ELAPSED_TIME);
  
-    //  Calculate time passed
+    //Calculate time passed
     int timeInterval = currentTime - previousTime;
  
+	//If a second has passed
     if(timeInterval > 1000)
     {
-        //  calculate the number of frames per second
+        //calculate the number of frames per second
         fps = frameCount / (timeInterval / 1000.0f);
  
-        //  Set time
+        //Reset for next fps update
         previousTime = currentTime;
- 
-        //  Reset frame count
         frameCount = 0;
     }
 }
 
 void setScreenSize()
 {
-	if(initCompleted)
+	//New code for dynamic screen size (call whenever screen type and size needs to be changed)
+	
+	if(initCompleted) //If not first time pass then increment and set
 	{
 		if(whichDisplayType < 2)
 		{
@@ -710,7 +894,7 @@ void setScreenSize()
 			screenHeightCm = screenHeightCmActive;
 		}
 	}
-	else
+	else //If first time pass then just check var and set
 	{
 		if(whichDisplayType == 0)
 		{
@@ -723,6 +907,7 @@ void setScreenSize()
 			screenHeightCm = screenHeightCmPassive;
 		}
 	}
+
 	//Any other variables set at startup but are based off screen size go here
 
 	lightPosition[0] = 10*screenHeightCm;
@@ -736,6 +921,7 @@ void keyboard (unsigned char key, int x, int y)
 	switch (key) {
 		case  27:  
 			exit (0);
+		//Move object in xyz
 		case 'w': 
 			zpos += 1;
 			glutPostRedisplay();  
@@ -760,6 +946,7 @@ void keyboard (unsigned char key, int x, int y)
 			ypos -= 1;
 			glutPostRedisplay();  
 			break;
+		//Print out essential vars (needs updated)
 		case 'p':
 			cout << "xpos = " << xpos << endl; 
 			cout << "ypos = " << ypos << endl;
@@ -774,25 +961,35 @@ void keyboard (unsigned char key, int x, int y)
 			cout << "worldHeadLoc[z] = " << worldHeadLoc[Z] << endl;
 
 			break;
+		//Invert eyes
 		case 'i':
 			eyeDistCm = -eyeDistCm;
 			invertEyes = !invertEyes;
 			break;
+		case 'o':
+			invertImages = !invertImages;
+			break;
+		//Force redisplay for testing
 		case 'r':
 			glutPostRedisplay();
 			break;
+		//Toggle full tracking or just X tracking
 		case 't':
 			yzTracking = !yzTracking;
 			break;
+		//Draw an object centered at 0,0,0 and spans across Y
 		case 'c':
 			drawCenter = !drawCenter;
 			break;
+		//Stop updating data from kinect
 		case 'k':
 			kinectToggle = !kinectToggle;
 			break;
+		//Show HUD (FPS, L, R)
 		case 'f':
-			fpsToggle = !fpsToggle;
+			hudToggle = !hudToggle;
 			break;
+		//Rotate object
 		case 'W': 
 			xrot += 1;
 			glutPostRedisplay();  
@@ -817,6 +1014,7 @@ void keyboard (unsigned char key, int x, int y)
 			zrot += 1;
 			glutPostRedisplay();  
 			break;
+		//Debug buttons
 		case '7': 
 			ofTesting += .1;
 			glutPostRedisplay(); 
@@ -825,12 +1023,10 @@ void keyboard (unsigned char key, int x, int y)
 			ofTesting -= .1;
 			glutPostRedisplay();
 			break;
-		case '8': 
-			ofTesting1 += .1;
+		case '8':
 			glutPostRedisplay();
 			break;
 		case '5': 
-			ofTesting1 -= .1;
 			glutPostRedisplay();
 			break;
 		case '9': 
@@ -841,11 +1037,13 @@ void keyboard (unsigned char key, int x, int y)
 			eyeDistCm -= .1;
 			glutPostRedisplay();
 			break;
+		//Rezero kinect offset position
 		case '0':
-			kinectOffsetCm[X] = -(skeletonPosition[NUI_SKELETON_POSITION_HEAD].x/ofTesting1) * 100;
-			kinectOffsetCm[Y] = -(skeletonPosition[NUI_SKELETON_POSITION_HEAD].y/ofTesting1) * 100;
+			kinectOffsetCm[X] = -(skeletonPosition[NUI_SKELETON_POSITION_HEAD].x) * 100;
+			kinectOffsetCm[Y] = -(skeletonPosition[NUI_SKELETON_POSITION_HEAD].y) * 100;
 			//kinectOffsetCm[Z] = -worldHeadLoc[Z];
 			break;
+		//Toggle which scene is drawn
 		case'1':
 			drawSceneOne = !drawSceneOne;
 			break;
@@ -855,12 +1053,14 @@ void keyboard (unsigned char key, int x, int y)
 		case'3':
 			drawSceneThree = !drawSceneThree;
 			break;
+		//Scale
 		case '+':
 			scale *=2;
 			break;
 		case '-':
 			scale /=2;
 			break;
+		//Toggle fullscreen
 		case ' ':
 			if(isFullscreen == true)
 			{
@@ -875,8 +1075,20 @@ void keyboard (unsigned char key, int x, int y)
 				isFullscreen = true;
 			}
 			break;
+		//Update screen type and size
 		case 127:
 			setScreenSize();
+			break;
+		case 39:
+			if (xMoveAmount <= 50)
+			{
+				xMoveAmount += .25;
+			}
+			else
+			{
+				xMoveAmount = -50;
+			}
+			glutPostRedisplay();
 			break;
 
 		default :  printf ("   key = %c -> %d\n", key, key);
@@ -888,8 +1100,8 @@ void display()
 	float nearPlane = .1;
     glMatrixMode(GL_MODELVIEW);
 	glLoadIdentity();   
-	glEnable(GL_NORMALIZE);
-	glClear(GL_COLOR_BUFFER_BIT|GL_DEPTH_BUFFER_BIT|GL_ACCUM_BUFFER_BIT|GL_STENCIL_BUFFER_BIT);
+	glEnable(GL_NORMALIZE); //Fixes scale and some other issues
+	glClear(GL_COLOR_BUFFER_BIT|GL_DEPTH_BUFFER_BIT); //Clear for when not using back left/right buffers
 	for(int i = 0; i < 2; i++)
 	{
 		if(sensor)
@@ -898,19 +1110,19 @@ void display()
 			{
 				getSkeletalData();
 			}
-			//grab head positions and convert to cm, offset values based on where the kinect is relative to screengithub
-			worldHeadLoc[X] = (skeletonPosition[NUI_SKELETON_POSITION_HEAD].x/ofTesting1) * 100 + kinectOffsetCm[X];
-			worldHeadLoc[Y] = (skeletonPosition[NUI_SKELETON_POSITION_HEAD].y/ofTesting1) * 100 + kinectOffsetCm[Y];
-			worldHeadLoc[Z] = (skeletonPosition[NUI_SKELETON_POSITION_HEAD].z/ofTesting1) * 100 + kinectOffsetCm[Z]; 
+			//grab head positions and convert to cm, offset values based on where the kinect is relative to screen
+			worldHeadLoc[X] = (skeletonPosition[NUI_SKELETON_POSITION_HEAD].x) * 100 + kinectOffsetCm[X];
+			worldHeadLoc[Y] = (skeletonPosition[NUI_SKELETON_POSITION_HEAD].y) * 100 + kinectOffsetCm[Y];
+			worldHeadLoc[Z] = (skeletonPosition[NUI_SKELETON_POSITION_HEAD].z) * 100 + kinectOffsetCm[Z]; 
 		}
 		else
 		{
-			worldHeadLoc[X] = kinectOffsetCm[X];
-			worldHeadLoc[Y] = kinectOffsetCm[Y];
-			worldHeadLoc[Z] = kinectOffsetCm[Z]; 
+			worldHeadLoc[X] = xMoveAmount;
+			worldHeadLoc[Y] = 0;
+			worldHeadLoc[Z] = 150; 
 		}
 
-		/*if(infoToggle)
+		/*if(infoToggle) //spit out info every update (uneeded
 		{
 			cout << worldHeadLoc[X] << "      " << worldHeadLoc[Y] << "      " << worldHeadLoc[Z] << endl;
 	
@@ -919,21 +1131,21 @@ void display()
 		if(whichDisplayType == 0)
 		{
 			glViewport(0,0, pixelWidth, pixelHeight);
-			if(isRightEye) //Draw Which Eye
+			if(isFirstEye) //Draw Which Eye
 			{
 				glDrawBuffer(GL_BACK_LEFT);
-				glClear(GL_COLOR_BUFFER_BIT|GL_DEPTH_BUFFER_BIT|GL_ACCUM_BUFFER_BIT|GL_STENCIL_BUFFER_BIT);
+				glClear(GL_COLOR_BUFFER_BIT|GL_DEPTH_BUFFER_BIT);
 			}
 			else //Draw Other Eye
 			{
 				glDrawBuffer(GL_BACK_RIGHT);
-				glClear(GL_COLOR_BUFFER_BIT|GL_DEPTH_BUFFER_BIT|GL_ACCUM_BUFFER_BIT|GL_STENCIL_BUFFER_BIT);
+				glClear(GL_COLOR_BUFFER_BIT|GL_DEPTH_BUFFER_BIT);
 			}
 		}
 		else if (whichDisplayType == 1)
 		{
 			glDrawBuffer(GL_BACK);
-			if(isRightEye) //Draw Which Eye
+			if(isFirstEye) //Draw Which Eye
 			{
 				glViewport(0,0, pixelWidth/2, pixelHeight);
 			}
@@ -946,7 +1158,7 @@ void display()
 		else if (whichDisplayType == 2)
 		{
 			glDrawBuffer(GL_BACK);
-			if(isRightEye) //Draw Which Eye
+			if(isFirstEye) //Draw Which Eye
 			{
 				glViewport(0,0, pixelWidth, pixelHeight/2);
 			}
@@ -957,14 +1169,24 @@ void display()
 			}			
 		}
 
-
+		if(isFirstEye) //Assumes point given by the kinect is perfectly in between two eyes
+		{
+			worldHeadLoc[X] += eyeDistCm;
+		}
+		else
+		{
+			worldHeadLoc[X] -= eyeDistCm;
+		}
+		if(!yzTracking)
+		{
+			//Setting these two values gets you 1D tracking, just set to near expected or average values (Likely will make later set to zeroed headLoc[Y] and headLoc[Z]
+			worldHeadLoc[Y] = 0;
+			worldHeadLoc[Z] = 150;
+		}
 
 		glPushMatrix();
-			//Draw Scene
-		if(drawSceneOne)
-		{
-			scene();	
-		}
+		//Draw Scenes
+
 		// Translations
 		glTranslatef(xpos, ypos, zpos);
 	
@@ -974,11 +1196,10 @@ void display()
 		glRotatef(xrot, 1,0,0);
 
 		glScalef(scale, scale, scale);
-
-		
-		//glMaterialfv(GL_FRONT_AND_BACK, GL_SPECULAR, white);
-		//glMaterialf(GL_FRONT_AND_BACK, GL_SHININESS, 20);
-
+		if(drawSceneOne) //This scene does not move when move buttons pressed
+		{
+			texBox();	
+		}
 		if(drawSceneTwo)
 		{
 			spheres();
@@ -996,36 +1217,34 @@ void display()
 		glMatrixMode(GL_PROJECTION);
 		glLoadIdentity();
 
-		//Functional
-		if(isRightEye)
-		{
-			worldHeadLoc[X] += eyeDistCm;
-		}
-		else
-		{
-			worldHeadLoc[X] -= eyeDistCm;
-		}
-		if(!yzTracking)
-		{
-			//Setting these two values gets you 1D tracking, just set to near expected or average values (Likely will make later set to last known/average headLoc[Y] and headLoc[Z]
-			worldHeadLoc[Y] = 38*ofTesting1;
-			worldHeadLoc[Z] = 243*ofTesting1;
-		}
+		//The meat of the whole thing
 		glFrustum(nearPlane*(-screenWidthCm - worldHeadLoc[X]/ofTesting)/worldHeadLoc[Z], nearPlane*(screenWidthCm - worldHeadLoc[X]/ofTesting)/worldHeadLoc[Z], nearPlane*(-screenHeightCm - worldHeadLoc[Y]/ofTesting)/worldHeadLoc[Z], nearPlane*(screenHeightCm - worldHeadLoc[Y]/ofTesting)/worldHeadLoc[Z], nearPlane, 200000.0);
 		gluLookAt(worldHeadLoc[X], worldHeadLoc[Y], worldHeadLoc[Z], worldHeadLoc[X], worldHeadLoc[Y], 0, 0, 1, 0);
-	
+		// /meat 
+
+		//Crappy version of meat (What the images currently use since simpler to render)
+		//glFrustum(-1.0*pixelWidth/pixelHeight, 1.0*pixelWidth/pixelHeight, -1.0, 1.0, 5.0, 2000.0);
+ 		//xrot = -((asin(worldHeadLoc[X]/(worldHeadLoc[Z])) * 180) / PI);
+		//glRotatef (xrot, 0.0,0.0,1.0);
+		//gluLookAt(0,0,100,0,0,0,0,1,0);
+
+		//Attempt to get somewhere in between without using transformations (Specifically frustum based transformations)
+		//glFrustum(-1.0*pixelWidth/pixelHeight, 1.0*pixelWidth/pixelHeight, -1.0, 1.0, 5.0, 2000.0);
+		//glTranslatef(worldHeadLoc[X], worldHeadLoc[Y], -worldHeadLoc[Z]);
+		//gluLookAt(-worldHeadLoc[X], 0, 100, 0, 0, 0, 0, 1, 0);
+
 		if(drawCenter)
 		{
 			//Test cylinder to show center of "rotation" during headtracking
 			glPushMatrix();
 				glRotatef(-90,1,0,0);
 				glTranslatef(0, 0, -50);
-				glColor3f(0.0,0.0,0.0);
+				glColor3f(1.0,1.0,1.0);
 				GLUquadricObj *quadObj = gluNewQuadric();
 				gluCylinder(quadObj, 1, 1, 4000, 100, 100);
 			glPopMatrix();
 		}
-		if(fpsToggle)
+		if(hudToggle)
 		{
 			glColor3f(1.0, 0.0, 0.0);	
 			glRasterPos3f(screenWidthCm - (screenWidthCm/8),screenHeightCm-(screenHeightCm/8),0);
@@ -1036,7 +1255,7 @@ void display()
 			}
 			if(leftRightToggle)
 			{
-				if(isRightEye)
+				if(isFirstEye)
 				{
 					if(!invertEyes)
 					{
@@ -1068,8 +1287,8 @@ void display()
 					}
 				}
 			}
-			isRightEye = !isRightEye;
 		}
+		isFirstEye = !isFirstEye;
 	}
 	glutSwapBuffers();
     calculateFPS();
@@ -1083,12 +1302,12 @@ void reshape(int w, int h)
 	pixelRatio = (float)w/h;
 }
 
+bool test = true;
 //get it all up and ready at start
 void init()
 {
 	glEnable(GL_DEPTH_TEST);
-	glClearColor(1.0, 1.0, 1.0, 1.0);
-	glColor3f(0.0, 0.0, 0.0);
+	glClearColor(0.0, 0.0, 0.0, 0.0); //Background is better black than white to reduce ghosting
 }
 
 
@@ -1103,13 +1322,15 @@ int main(int argc, char** argv)
 	if(!sensor)
 	{
 		cout << "Kinect not found, proceeding to just render scene\n";
+		eyeDistCm = 0;
+		hudToggle = false;
 	}
 	cout << "Loading Textures and Scene \n";
 	glutInit(&argc, argv);
 
 	try
 	{
-		glutInitDisplayMode(GLUT_RGB|GLUT_DEPTH|GLUT_DOUBLE|GLUT_STEREO);
+		glutInitDisplayMode(GLUT_RGB|GLUT_DEPTH|GLUT_DOUBLE);
 		glutInitWindowSize(800, 450);
 		pixelRatio = (float)800/450;
 		glutInitWindowPosition(50, 50);
@@ -1117,13 +1338,22 @@ int main(int argc, char** argv)
 		glutDisplayFunc(display);
 		glutReshapeFunc(reshape);
 		glutKeyboardFunc(keyboard);
-		glutIdleFunc(display); //To limit to when kinect is ready set to getSkeletonData
 
+		//To limit to when kinect is ready set to getSkeletalData and uncomment out glutPostRedisplay in get getSkeletalData 
+			//if you wanna be clean comment out getSkeletalData from display as well
+		//otherwise comment glutPost and set this to display. 
+		//At some point I will also try to get glutTimerFunc working again
+		glutIdleFunc(display);
+				
+		
+		glewInit();
 		
 		init();
-		initTexturesBmp("textures\\bay\\bayScene");
+		initTexturesBmp("textures\\headtracking\\headtracking");
 		//initMesh("meshes\\xyzrgb_statuette_simplify.ply", 9, 15.5, 8, 5, -5.35, 17, 0, 0, 0);
-		initMesh("meshes\\xyzrgb_statuette_simplify.ply", 30, 60, 30, 0, 0, 0, 90, 0, 0);
+		cout << "Loading Mesh" << endl;
+		initMesh("meshes\\xyzrgb_statuette_simplify.ply", 30, 60, 30, 0, 30, 0, 90, 0, 0);
+
 	}
 	catch(exception e)
 	{
@@ -1131,20 +1361,21 @@ int main(int argc, char** argv)
 		system("pause");
 		exit(0);
 	}
-
+	
 	GLboolean stereo = 0;
 
 	glGetBooleanv(GL_STEREO, &stereo);
 
 	if (stereo)
 	{
-		cout << "Stero ready card detected :)" << endl;
+		cout << "Stero supported :)" << endl;
 		glEnable(GLUT_STEREO);
 	}
 	else
 	{
-		cout << "Stereo ready card not detected :(" << endl;
+		cout << "Stereo not supported :(" << endl;
 	}
+	
 	initCompleted = true;
 	glutMainLoop();   
 }
