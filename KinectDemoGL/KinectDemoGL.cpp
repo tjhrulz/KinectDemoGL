@@ -11,10 +11,10 @@
 #include <GL/glew.h>
 
 //GLUT and OpenGL things
-#include <gl/GL.h>
+//#include <gl/GL.h>
 #include <gl/GLU.h>
 #include <GL/glut.h>
-
+#define GLEW_STATIC
 //Kinect things
 #include <NuiApi.h>
 #include <NuiImageCamera.h>
@@ -30,7 +30,6 @@ using namespace std;
 	//Import start vars from file
 
 const int BLURFREQUENCY = 0;	//Set how many partial transitions between each texture update (unfinished)
-const int TEXTURECOUNT = 40;
 //How many texture files to load (recently untested)
 const double PI = 3.14159265358979323846;	//PI for when needed (currently unused)
 
@@ -74,19 +73,16 @@ float worldHeadLoc[3];
 
 
 //Texture Importer Vars
-GLuint textureID2D[TEXTURECOUNT];
-int textureWidth2D[TEXTURECOUNT];
-int textureHeight2D[TEXTURECOUNT];
-char * textureData2D[TEXTURECOUNT];
-
-GLuint textureID3D;
-char * textureData3D;
-int textureWidth3D;
-int textureHeight3D;
+GLuint * textureID2D;
 
 int textureToLoad = 0;
-int blendsTillTexture = 0;
+int textureToLoad3D = 0;
 
+bool textureBuffer3Dsupported = false;
+GLuint *textureID3D;
+char *displayMethod;
+int *textureSliceCount;
+int number3DTextures;
 
 //Mesh Importer Vars
 float* faces_Triangles;
@@ -174,7 +170,6 @@ bool drawSceneThree = true;
 
 //Pic chosen Vars
 float picDistAbs = 100;
-float picInterval = picDistAbs / TEXTURECOUNT;
 bool invertImages = false;
 
 bool initKinect() 
@@ -230,17 +225,23 @@ void getSkeletalData()
 	}
 }
 
-void initTexturesBmp(string baseFileName)
+void initTexturesBmp(string baseFileName, int textureCount, char loadParams)
 {
-	if(glewIsSupported("GL_VERSION_1_4"))
+	if(textureBuffer3Dsupported)
 	{
+		char * textureData3D;
+		int textureWidth3D;
+		int textureHeight3D;
 		cout << "3D textures supported :)" << endl; 
 
 		char header[BMPHEADERSIZE]; //How large the header should be in a bmp
 
-		int imageSize3D =TEXTURECOUNT;
+		long long int imageSize3D = textureCount;
+		textureSliceCount[textureToLoad3D] = textureCount;
+		displayMethod[textureToLoad3D] = loadParams;
 
-		while(textureToLoad < TEXTURECOUNT)
+
+		while(textureToLoad < textureCount)
 		{
 			string fileName = baseFileName + " (" + std::to_string(static_cast<long long>(textureToLoad+1)) + ").bmp";	//Take the base image name and add on the counting system which is image (x+1).bmp (Easy to rename on widows like that
 			//Right now this is hard coded until I can figure out a platform agnostic way to programatically get the name of every image in a folder		
@@ -265,7 +266,7 @@ void initTexturesBmp(string baseFileName)
 		
 			if(textureToLoad == 0)
 			{
-				imageSize3D *= *(int*)&(header[0x22]);
+				imageSize3D *= imageSize2D;
 				textureWidth3D = *(int*)&(header[0x12]);
 				textureHeight3D = *(int*)&(header[0x16]);
 
@@ -276,42 +277,46 @@ void initTexturesBmp(string baseFileName)
 			char *textureDataTemp = new char [imageSize2D];
 			fread(textureDataTemp,1,imageSize2D,file); //Load in the data from the image to appropriate array location
 
-			cout << (sizeof(textureDataTemp)/sizeof(*textureDataTemp)) <<endl;
-			cout << (sizeof(*textureDataTemp)) <<endl;
-			cout << (sizeof(textureDataTemp))<<endl;
+	//		fread((textureData3D + imageSize2D * textureToLoad),1,imageSize2D,file); //Load in the data from the image to appropriate array location
 
-			for(int i = 0; i < ((sizeof(textureDataTemp)/sizeof(*textureDataTemp))); i++)
+			//memcpy(textureData3D + sizeof(char *) * textureToLoad, textureDataTemp, sizeof(textureDataTemp)); 
+			for(int i = 0; i < imageSize2D; i++)
 			{
-				textureData3D[i+(textureToLoad*(sizeof(textureDataTemp)/sizeof(*textureDataTemp)))] = textureDataTemp[i];
+				textureData3D[i+((long long int)imageSize2D*textureToLoad)] = textureDataTemp[i];
 			}
+			
 			fclose(file); //Clean up unneeded resources
 			textureToLoad++;
+			cout << "Texture Number: " << textureToLoad << endl;
+
 		}
-		glPixelStorei(GL_UNPACK_ALIGNMENT,1);
-		glGenTextures(1, &textureID3D);
+		
 
- 
-		textureToLoad++;
-		cout << "Texture Number: " << textureToLoad << endl;
-
-		/*GLubyte* pVolume=new GLubyte[size];
-		fread(pVolume,sizeof(GLubyte),size,pFile);
-		fclose(pFile);
-		glPixelStorei(GL_UNPACK_ALIGNMENT,1);
-		glGenTextures(1, &volume_texture);
-
-
-
-		delete []pVolume;
-		cout << "volume texture created" << endl;
-		*/
+		glBindTexture(GL_TEXTURE_3D, textureID3D[textureToLoad3D]);
+		//glTexEnvi(GL_TEXTURE_ENV, GL_TEXTURE_ENV_MODE, GL_REPLACE);
+		glTexParameteri(GL_TEXTURE_3D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_BORDER);
+		glTexParameteri(GL_TEXTURE_3D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_BORDER);
+		glTexParameteri(GL_TEXTURE_3D, GL_TEXTURE_WRAP_R, GL_CLAMP_TO_BORDER);
+		glTexParameteri(GL_TEXTURE_3D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+		glTexParameteri(GL_TEXTURE_3D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+		glTexImage3D(GL_TEXTURE_3D, 0,GL_RGB, textureWidth3D, textureHeight3D,textureCount,0, GL_BGR_EXT,GL_UNSIGNED_BYTE,textureData3D);
+		
+		textureToLoad = 0;
+		textureToLoad3D++;
 	}
 	else
 	{
+		//This code needs reworked it is way to hacky and is done wrong, use the 3D buffers since it uses way less space since everything is managed correctly
 		cout << "3D textures not supported :(" << endl; 
+		cout << "This code probably doesnt work anymore :(";
 		//Load in all the textures
-		while(textureToLoad < TEXTURECOUNT)
+		textureID2D = new GLuint[textureCount];
+		while(textureToLoad < textureCount)
 		{
+			int * textureWidth2D = new int [textureCount];
+			int * textureHeight2D = new int [textureCount];
+			char ** textureData2D = new char*[textureCount];
+			
 			char header[BMPHEADERSIZE]; //How large the header should be in a bmp
 			int dataPos; //Where the image starts     
 			int imageSize; //How many pixels are there
@@ -348,7 +353,13 @@ void initTexturesBmp(string baseFileName)
 			
 			glPixelStorei(GL_UNPACK_ALIGNMENT,1);
 			glGenTextures(1, &textureID2D[textureToLoad]);
+			
+			glTexImage2D(GL_TEXTURE_2D, 0,GL_RGB, textureWidth2D[textureToLoad], textureHeight2D[textureToLoad], 0, GL_BGR_EXT, GL_UNSIGNED_BYTE, textureData2D[textureToLoad]);
 
+			glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
+			glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
+			glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+			glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
  
 			textureToLoad++;
 			cout << "Texture Number: " << textureToLoad << endl;
@@ -688,30 +699,69 @@ void texBox()
 	{
 		worldHeadLoc[X] += 2*eyeDistCm;
 	}
-	
 
-	if(glewIsSupported("GL_VERSION_1_4"))
+
+	float picInterval = picDistAbs / textureSliceCount[textureToLoad3D];
+
+	if(textureBuffer3Dsupported)
 	{
 		glEnable(GL_TEXTURE_3D);
-		glBindTexture(GL_TEXTURE_3D, textureID3D);
-		glTexEnvi(GL_TEXTURE_ENV, GL_TEXTURE_ENV_MODE, GL_REPLACE);
-		glTexParameteri(GL_TEXTURE_3D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-		glTexParameteri(GL_TEXTURE_3D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
-		glTexParameteri(GL_TEXTURE_3D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_BORDER);
-		glTexParameteri(GL_TEXTURE_3D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_BORDER);
-		glTexParameteri(GL_TEXTURE_3D, GL_TEXTURE_WRAP_R, GL_CLAMP_TO_BORDER);
-		glTexImage3D(GL_TEXTURE_3D, 0,GL_INTENSITY, textureWidth3D, textureHeight3D,TEXTURECOUNT,0, GL_LUMINANCE,GL_UNSIGNED_BYTE,textureData3D);
+		glBindTexture(GL_TEXTURE_3D, textureID3D[textureToLoad3D]);
 
+		float textureSquareLoc = picDistAbs/2;
+		if(!invertImages)
+		{
+			if(worldHeadLoc[X] >= picDistAbs/2)
+			{
+				textureSquareLoc = picDistAbs / picInterval -1;
+			}
+			else if (worldHeadLoc[X] <= -picDistAbs/2)
+			{
+				textureSquareLoc = 0.1;
+			}
+			else
+			{
+				textureSquareLoc = ((picDistAbs/2) + worldHeadLoc[X]) / picInterval - 1;
+			}
+		}
+		else
+		{
+			if(worldHeadLoc[X] >= picDistAbs/2)
+			{
+				textureSquareLoc = 0.1;
+			}
+			else if (worldHeadLoc[X] <= -picDistAbs/2)
+			{
+				textureSquareLoc = picDistAbs / picInterval -1;
+			}
+			else
+			{
+				textureSquareLoc = (picDistAbs / picInterval -1) -(((picDistAbs/2) + worldHeadLoc[X]) / picInterval - 1);
+			}
+		}
+		
+		//glTexImage3D(GL_TEXTURE_3D, 0,GL_INTENSITY, textureWidth3D, textureHeight3D,TEXTURECOUNT,0, GL_BGR_EXT,GL_UNSIGNED_BYTE,textureData3D);
 		
 		glBegin(GL_QUADS); //Back
 			glColor3f(1.0,1.0,1.0);
 			glNormal3d(0, 0, 1);
-			glTexCoord3f(1,-0,0);		glVertex3f( screenWidthCm,-screenHeightCm,-2*screenHeightCm+.01); 
-			glTexCoord3f(1,1,0);		glVertex3f( screenWidthCm, screenHeightCm,-2*screenHeightCm+.01);  
-			glTexCoord3f(-0,1,0);		glVertex3f(-screenWidthCm, screenHeightCm,-2*screenHeightCm+.01);
-			glTexCoord3f(-0,-0,0);	glVertex3f(-screenWidthCm,-screenHeightCm,-2*screenHeightCm+.01);
-		glEnd();
+			if(displayMethod[textureToLoad3D] == 't')
+			{
+				glTexCoord3f(1,-0,((int)textureSquareLoc/(float)textureSliceCount[textureToLoad3D]+ofTesting1));		glVertex3f( screenWidthCm,-screenHeightCm,-2*screenHeightCm+.01); 
+				glTexCoord3f(1,1,((int)textureSquareLoc/(float)textureSliceCount[textureToLoad3D]+ofTesting1));		glVertex3f( screenWidthCm, screenHeightCm,-2*screenHeightCm+.01);  
+				glTexCoord3f(0,1,((int)textureSquareLoc/(float)textureSliceCount[textureToLoad3D]+ofTesting1));		glVertex3f(-screenWidthCm, screenHeightCm,-2*screenHeightCm+.01);
+				glTexCoord3f(0,-0,((int)textureSquareLoc/(float)textureSliceCount[textureToLoad3D]+ofTesting1));		glVertex3f(-screenWidthCm,-screenHeightCm,-2*screenHeightCm+.01);
+			}
+			else
+			{
+				glTexCoord3f(1,-0,textureSquareLoc/(float)textureSliceCount[textureToLoad3D]+ofTesting1);		glVertex3f( screenWidthCm,-screenHeightCm,-2*screenHeightCm+.01); 
+				glTexCoord3f(1,1,textureSquareLoc/(float)textureSliceCount[textureToLoad3D]+ofTesting1);		glVertex3f( screenWidthCm, screenHeightCm,-2*screenHeightCm+.01);  
+				glTexCoord3f(0,1,textureSquareLoc/(float)textureSliceCount[textureToLoad3D]+ofTesting1);		glVertex3f(-screenWidthCm, screenHeightCm,-2*screenHeightCm+.01);
+				glTexCoord3f(0,-0,textureSquareLoc/(float)textureSliceCount[textureToLoad3D]+ofTesting1);		glVertex3f(-screenWidthCm,-screenHeightCm,-2*screenHeightCm+.01);
+			}
 
+		glEnd();
+		glDisable(GL_TEXTURE_3D);
 	}
 	else
 	{
@@ -748,12 +798,7 @@ void texBox()
 				textureToLoad = (picDistAbs / picInterval -1) -(((picDistAbs/2) + worldHeadLoc[X]) / picInterval - 1);
 			}
 		}
-		glTexImage2D(GL_TEXTURE_2D, 0,GL_RGB, textureWidth2D[textureToLoad], textureHeight2D[textureToLoad], 0, GL_BGR_EXT, GL_UNSIGNED_BYTE, textureData2D[textureToLoad]);
 
-		glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
-		glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
-		glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
-		glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
 		/*
 		glBegin(GL_QUADS); //Bottom
 			glColor3f(1.0,1.0,1.0);
@@ -796,50 +841,11 @@ void texBox()
 			glTexCoord2f(-0,-0);	glVertex3f(-screenWidthCm,-screenHeightCm,-2*screenHeightCm+.01);
 		glEnd();
 
-		//Unfinished does not run if BLURFREQUENCY is set to 0 likely will be completely rewritten in the future
-		//Intended to be used later when real images are what is set to be displayed so we can get some interpolation
-		if(blendsTillTexture == BLURFREQUENCY)
-		{
-			//cout << "Dont do blend " << textureToLoad << endl;
-			blendsTillTexture = 0;
-
-			//textureToLoad ++;
-		}
-		else
-		{
-			glEnable(GL_BLEND);
-			//glBlendFunc(GL_ONE_MINUS_DST_COLOR, GL_ONE_MINUS_SRC_COLOR);
-			//glBlendFunc(GL_SRC_COLOR, GL_DST_COLOR);
-			//glBlendFunc(GL_ONE, GL_ONE_MINUS_SRC_COLOR);
-			//glBlendFunc(GL_SRC_COLOR ,GL_ONE_MINUS_SRC_COLOR );
-			glBlendFunc(GL_ONE, GL_ONE);
-
-			glTexImage2D(GL_TEXTURE_2D, 0,GL_RGB, textureWidth2D[textureToLoad-1], textureHeight2D[textureToLoad-1], 0, GL_BGR_EXT, GL_UNSIGNED_BYTE, textureData2D[textureToLoad-1]);
-			glBegin(GL_QUADS); //Back
-				glColor3f(1.0,1.0,1.0);
-				glNormal3d(0, 0, 1);		
-				glTexCoord2f(1,-0);		glVertex3f( screenWidthCm,-screenHeightCm,-screenHeightCm-.1); 
-				glTexCoord2f(1,1);		glVertex3f( screenWidthCm, screenHeightCm,-screenHeightCm-.1);  
-				glTexCoord2f(-0,1);		glVertex3f(-screenWidthCm, screenHeightCm,-screenHeightCm-.1);
-				glTexCoord2f(-0,-0);	glVertex3f(-screenWidthCm,-screenHeightCm,-screenHeightCm-.1);
-			glEnd();
-
-
-			//cout << "Do blend " << blendsTillTexture << endl;
-			blendsTillTexture ++;
-		
-
 		}	
-
-		if(textureToLoad == TEXTURECOUNT)
-		{
-			textureToLoad = 0;
-		}
 
 		glDisable(GL_TEXTURE_2D);
 		glDisable(GL_BLEND);
-	}
-	
+
 	glPopMatrix(); 
 	//Temporary until I reverse the image loader
 	if(isFirstEye) //Assumes point given by the kinect is perfectly in between two eyes
@@ -1024,9 +1030,11 @@ void keyboard (unsigned char key, int x, int y)
 			glutPostRedisplay();
 			break;
 		case '8':
+			ofTesting1 += .05;
 			glutPostRedisplay();
 			break;
 		case '5': 
+			ofTesting1 -= .05;
 			glutPostRedisplay();
 			break;
 		case '9': 
@@ -1073,6 +1081,17 @@ void keyboard (unsigned char key, int x, int y)
 			{
 				glutFullScreen();
 				isFullscreen = true;
+			}
+			break;
+		case 8:
+			if(textureToLoad3D >= number3DTextures - 1)
+			{
+				textureToLoad3D = 0;
+			}
+			else
+			{
+				cout << sizeof(textureID3D);
+				textureToLoad3D ++;
 			}
 			break;
 		//Update screen type and size
@@ -1218,7 +1237,7 @@ void display()
 		glLoadIdentity();
 
 		//The meat of the whole thing
-		glFrustum(nearPlane*(-screenWidthCm - worldHeadLoc[X]/ofTesting)/worldHeadLoc[Z], nearPlane*(screenWidthCm - worldHeadLoc[X]/ofTesting)/worldHeadLoc[Z], nearPlane*(-screenHeightCm - worldHeadLoc[Y]/ofTesting)/worldHeadLoc[Z], nearPlane*(screenHeightCm - worldHeadLoc[Y]/ofTesting)/worldHeadLoc[Z], nearPlane, 200000.0);
+		glFrustum(nearPlane*(-screenWidthCm - worldHeadLoc[X])/worldHeadLoc[Z], nearPlane*(screenWidthCm - worldHeadLoc[X])/worldHeadLoc[Z], nearPlane*(-screenHeightCm - worldHeadLoc[Y])/worldHeadLoc[Z], nearPlane*(screenHeightCm - worldHeadLoc[Y])/worldHeadLoc[Z], nearPlane, 200000.0);
 		gluLookAt(worldHeadLoc[X], worldHeadLoc[Y], worldHeadLoc[Z], worldHeadLoc[X], worldHeadLoc[Y], 0, 0, 1, 0);
 		// /meat 
 
@@ -1304,10 +1323,41 @@ void reshape(int w, int h)
 
 bool test = true;
 //get it all up and ready at start
-void init()
+void init(int numTextures)
 {
 	glEnable(GL_DEPTH_TEST);
 	glClearColor(0.0, 0.0, 0.0, 0.0); //Background is better black than white to reduce ghosting
+
+	glewInit();
+
+	if(glewIsSupported("GL_VERSION_1_4"))
+	{
+		textureBuffer3Dsupported = true;
+	}
+
+	textureID3D = new GLuint[numTextures];
+	textureSliceCount = new int[numTextures];
+	displayMethod = new char[numTextures];
+
+	//glPixelStorei(GL_UNPACK_ALIGNMENT,1);
+	glGenTextures(numTextures, textureID3D);
+
+	cout << "Loading Textures" << endl;	
+	initTexturesBmp("textures\\v2\\v2", 79, 'n');
+	initTexturesBmp("textures\\v2\\v2", 79, 't');
+	initTexturesBmp("textures\\bunny\\bunny", 119, 'n');
+	initTexturesBmp("textures\\bunny\\bunny", 119, 't');
+	initTexturesBmp("textures\\bunny_reduced\\bunny", 60, 'n');
+	initTexturesBmp("textures\\bunny_reduced\\bunny", 60, 't');
+	number3DTextures = numTextures;
+
+	//initTexturesBmp("textures\\v2_xpos\\v2_xpos", 340);
+	//initMesh("meshes\\xyzrgb_statuette_simplify.ply", 9, 15.5, 8, 5, -5.35, 17, 0, 0, 0);
+
+	cout << "Loading Mesh" << endl;
+	initMesh("meshes\\xyzrgb_statuette_simplify.ply", 30, 60, 30, 0, 30, 0, 90, 0, 0);
+
+	textureToLoad3D = 0;
 }
 
 
@@ -1325,12 +1375,11 @@ int main(int argc, char** argv)
 		eyeDistCm = 0;
 		hudToggle = false;
 	}
-	cout << "Loading Textures and Scene \n";
 	glutInit(&argc, argv);
 
 	try
 	{
-		glutInitDisplayMode(GLUT_RGB|GLUT_DEPTH|GLUT_DOUBLE);
+		glutInitDisplayMode(GLUT_RGB|GLUT_DEPTH|GLUT_DOUBLE|GLUT_STEREO);
 		glutInitWindowSize(800, 450);
 		pixelRatio = (float)800/450;
 		glutInitWindowPosition(50, 50);
@@ -1346,13 +1395,7 @@ int main(int argc, char** argv)
 		glutIdleFunc(display);
 				
 		
-		glewInit();
-		
-		init();
-		initTexturesBmp("textures\\headtracking\\headtracking");
-		//initMesh("meshes\\xyzrgb_statuette_simplify.ply", 9, 15.5, 8, 5, -5.35, 17, 0, 0, 0);
-		cout << "Loading Mesh" << endl;
-		initMesh("meshes\\xyzrgb_statuette_simplify.ply", 30, 60, 30, 0, 30, 0, 90, 0, 0);
+		init(6);
 
 	}
 	catch(exception e)
@@ -1375,7 +1418,7 @@ int main(int argc, char** argv)
 	{
 		cout << "Stereo not supported :(" << endl;
 	}
-	
+	cout << "current renderer being used is: " << glGetString(GL_RENDERER);
 	initCompleted = true;
 	glutMainLoop();   
 }
