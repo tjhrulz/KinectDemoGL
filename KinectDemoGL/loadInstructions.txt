@@ -1,0 +1,14 @@
+Screen width of active display (cm) = 30.1
+Screen height of active display (cm) = 17.1
+Screen width of passive display (cm) = 71.15
+Screen height of active display (cm) = 40.25
+Track position in Y and Z and not just X = true
+Display HUD (Framerate, eye cues, etc) = false
+What display is default = active
+Eye Distance (cm) = 4
+Draw textures = true
+Draw spheres = false
+Draw Mesh = true
+Real world image distance (How fast iages change) = 100
+Invert image series = false
+Number of textures to keep on vRAM (More than 3 not suggested) = 3
