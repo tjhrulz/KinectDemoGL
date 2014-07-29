@@ -71,14 +71,14 @@ float worldHeadLoc[3];
 GLuint * textureID2D;
 
 int textureToLoad = 0;
+int gpuTextureLocation = 0;
 int textureToLoad3D = 0;
 
 bool textureBuffer3Dsupported = false;
 GLuint *textureID3D;
-int *textureSliceCount;
 
 //Mesh Importer Vars
-string meshLocation = "meshes\\xyzrgb_statuette_simplify.ply";
+string meshPath = "meshes\\xyzrgb_statuette_simplify.ply";
 float* faces_Triangles;
 float* faces_Quads;
 float* vertex_Buffer;
@@ -178,7 +178,8 @@ int rotationY = 0;
 int num3DTexturesVRAM = 1;
 int num3DTexturesTotal = 1;
 string* textureLocations;
-char displayMethod = ' ';
+int *textureSliceCount;
+char displayMethod = 'n';
 
 
 
@@ -198,6 +199,18 @@ bool stringToBool(string booleanValue)
 	{
 		cout << "Boolean misformated assuming false";
 		return false;		
+	}
+}
+
+string boolToString(bool boolean)
+{
+	if(boolean)
+	{
+		return "true";
+	}
+	else
+	{
+		return "false";
 	}
 }
 
@@ -223,7 +236,7 @@ string convertDisplayType(int whichDisplayType)
 	}
 }
 
-int connvertDisplayType(string whichDisplayType)
+int convertDisplayType(string whichDisplayType)
 {
 	if(whichDisplayType.find("active") != -1 || atoi(whichDisplayType.c_str()) == 0)
 	{
@@ -244,6 +257,25 @@ int connvertDisplayType(string whichDisplayType)
 	}
 }
 
+string parseString(string data)
+{
+	for(int i = 0; i < data.length()-1; i++)
+	{
+		if(data[i] == ' ')
+		{
+			data.erase(i, i+1);
+		}
+		else if(data[i] == '\\')
+		{
+			data.insert(i, 1, '\\');
+			i++;
+		}
+	}
+	return data;
+
+}
+
+void init();
 void loadParams()
 {
 	string buffer;
@@ -282,7 +314,7 @@ void loadParams()
 		hudToggle = stringToBool(buffer.substr(1+buffer.find_last_of('=')).c_str());
 		
 		getline(loadInstructions, buffer);
-		whichDisplayType = 0;//figure something out here
+		convertDisplayType(buffer.substr(1+buffer.find_last_of('=')).c_str());
 
 		//3D Display Vars
 		getline(loadInstructions, buffer);
@@ -296,6 +328,10 @@ void loadParams()
 		drawSceneTwo = stringToBool(buffer.substr(1+buffer.find_last_of('=')).c_str());
 		getline(loadInstructions, buffer);
 		drawSceneThree = stringToBool(buffer.substr(1+buffer.find_last_of('=')).c_str());
+		
+		//Mesh Var
+		getline(loadInstructions, buffer);
+		meshPath = parseString(buffer.substr(1+buffer.find_last_of('=')).c_str());
 
 		//Texture Vars
 		getline(loadInstructions, buffer);
@@ -307,6 +343,19 @@ void loadParams()
 
 		getline(loadInstructions, buffer);
 		num3DTexturesTotal = atoi(buffer.substr(1+buffer.find_last_of('=')).c_str());
+
+		textureLocations = new string[num3DTexturesTotal];
+		textureSliceCount = new int[num3DTexturesTotal];
+
+		//Maybe check here to make sure not at end of file already since if so file must be miss formated
+		for(int i = 0; i < num3DTexturesTotal; i++)
+		{
+			getline(loadInstructions, buffer);
+			textureLocations[i] = parseString(buffer.substr(1+buffer.find_last_of('=')));
+			getline(loadInstructions, buffer);
+			textureSliceCount[i] = atoi(buffer.substr(1+buffer.find_last_of('=')).c_str());
+		}
+
 
 		loadInstructions.close();
 	}
@@ -324,8 +373,8 @@ void loadParams()
 			writeInstructions << "Screen height of active display (cm) = " <<screenHeightCmPassive << endl;
 
 		
-			writeInstructions << "Track position in Y and Z and not just X = " << yzTracking << endl;
-			writeInstructions << "Display HUD (Framerate, eye cues, etc) = " << hudToggle << endl;
+			writeInstructions << "Track position in Y and Z and not just X = " << boolToString(yzTracking) << endl;
+			writeInstructions << "Display HUD (Framerate, eye cues, etc) = " << boolToString(hudToggle) << endl;
 		
 			writeInstructions << "What display is default = " << convertDisplayType(whichDisplayType) << endl;
 
@@ -334,30 +383,30 @@ void loadParams()
 	
 
 			//Scene Vars
-			writeInstructions << "Draw textures = " << drawSceneOne << endl;
-			writeInstructions << "Draw spheres = " << drawSceneTwo << endl;
-			writeInstructions << "Draw Mesh = " << drawSceneThree << endl;
+			writeInstructions << "Draw textures = " << boolToString(drawSceneOne) << endl;
+			writeInstructions << "Draw spheres = " << boolToString(drawSceneTwo) << endl;
+			writeInstructions << "Draw Mesh = " << boolToString(drawSceneThree) << endl;
 
 			//Mesh Location
-			writeInstructions << "Path to mesh (with escape characters sorry but can be relative to current directory) = " << meshLocation << endl;
+			writeInstructions << "Path to mesh (can be relative to current directory) = " << meshPath << endl;
 
 			//Texture Vars
 			writeInstructions << "Real world image distance (How fast iages change) = " << picDistAbs << endl;
-			writeInstructions << "Invert image series = " << invertImages << endl;
+			writeInstructions << "Invert image series = " << boolToString(invertImages) << endl;
 			writeInstructions << "Number of textures to keep on vRAM (More than 3 not suggested) = " << num3DTexturesVRAM << endl;
 
 			writeInstructions << "Number of sets of texures to load = " << num3DTexturesTotal << endl;
 
+			textureLocations = new string[num3DTexturesTotal];
+			textureSliceCount = new int[num3DTexturesTotal];
+			for(int i = 0; i < num3DTexturesTotal; i++)
+			{
+				writeInstructions << "Path to texture number" << i << " = " << "textures\\v2_s\\v2_s" << endl;
+				textureLocations[i] = "textures\\v2_s\\v2_s";
+				writeInstructions << "Image count for texture number" << i << " = " << 78 << endl;
+				textureSliceCount[i] = 78;
+			}
 
-			/*
-			initTexturesBmp("textures\\v2_s\\v2_s", 78, ' ');
-			initTexturesBmp("textures\\xpos\\xpos", 35, ' ');
-			initTexturesBmp("textures\\v2_s_Dreduced\\v2_s", 20, ' ');
-
-			initTexturesBmp("textures\\v2_s\\v2_s", 78, 't');
-			initTexturesBmp("textures\\v2_s_reduced\\v2_s", 39, 't');
-			initTexturesBmp("textures\\v2_s_Dreduced\\v2_s", 20, 't');
-			*/
 			writeInstructions.close();
 		}
 		else
@@ -421,7 +470,6 @@ void getSkeletalData()
 		}
 	}
 }
-
 void initTexturesBmp(string baseFileName, int textureCount)
 {
 	if(textureBuffer3Dsupported)
@@ -434,7 +482,6 @@ void initTexturesBmp(string baseFileName, int textureCount)
 		char header[BMPHEADERSIZE]; //How large the header should be in a bmp
 
 		long long int imageSize3D = textureCount;
-		textureSliceCount[textureToLoad3D] = textureCount;
 
 
 		while(textureToLoad < textureCount)
@@ -481,6 +528,7 @@ void initTexturesBmp(string baseFileName, int textureCount)
 				textureData3D[i+((long long int)imageSize2D*textureToLoad)] = textureDataTemp[i];
 			}
 			
+			delete textureDataTemp;
 			fclose(file); //Clean up unneeded resources
 			textureToLoad++;
 			cout << "Texture Number: " << textureToLoad << endl;
@@ -488,7 +536,7 @@ void initTexturesBmp(string baseFileName, int textureCount)
 		}
 		
 
-		glBindTexture(GL_TEXTURE_3D, textureID3D[textureToLoad3D]);
+		glBindTexture(GL_TEXTURE_3D, textureID3D[gpuTextureLocation]);
 		//glTexEnvi(GL_TEXTURE_ENV, GL_TEXTURE_ENV_MODE, GL_REPLACE);
 		glTexParameteri(GL_TEXTURE_3D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
 		glTexParameteri(GL_TEXTURE_3D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
@@ -502,7 +550,16 @@ void initTexturesBmp(string baseFileName, int textureCount)
 		textureToLoad = 0;
 		
 		//Circular locations for textures
-		if(textureToLoad3D < num3DTexturesVRAM -1)
+		if(gpuTextureLocation < num3DTexturesVRAM -1)
+		{
+			gpuTextureLocation++;
+		}
+		else 
+		{
+			gpuTextureLocation = 0;
+		}
+
+		if(textureToLoad3D < num3DTexturesTotal -1)
 		{
 			textureToLoad3D++;
 		}
@@ -510,7 +567,7 @@ void initTexturesBmp(string baseFileName, int textureCount)
 		{
 			textureToLoad3D = 0;
 		}
-
+		
 		delete textureData3D;
 
 	}
@@ -522,6 +579,43 @@ void initTexturesBmp(string baseFileName, int textureCount)
 		exit(0);
 	}
 }
+
+void changeTexture()
+{
+	if(gpuTextureLocation >= num3DTexturesVRAM - 1)
+	{
+		if(textureToLoad3D >= num3DTexturesTotal)
+		{
+			gpuTextureLocation = 0;
+			textureToLoad3D = 0;
+			for(int i = 0; i < num3DTexturesVRAM; i++)
+			{
+				if(textureToLoad3D >= num3DTexturesTotal)
+				{
+					textureToLoad3D = 0;
+				}
+				initTexturesBmp(textureLocations[textureToLoad3D], textureSliceCount[textureToLoad3D]);	
+			}
+		}
+		else
+		{
+			gpuTextureLocation = 0;
+			for(int i = 0; i < num3DTexturesVRAM; i++)
+			{
+				if(textureToLoad3D >= num3DTexturesTotal)
+				{
+					textureToLoad3D = 0;
+				}
+				initTexturesBmp(textureLocations[textureToLoad3D], textureSliceCount[textureToLoad3D]);	
+			}
+		}
+	}
+	else
+	{
+		gpuTextureLocation ++;
+	}
+}
+
 
 float* calculateNormal( float *coord1, float *coord2, float *coord3 )
 {
@@ -552,7 +646,7 @@ float* calculateNormal( float *coord1, float *coord2, float *coord3 )
 	return norm;
 }
 
-void initMesh(char* filename, float meshScaleX, float meshScaleY, float meshScaleZ, float xPos, float yPos, float zPos, float xRot, float yRot, float zRot)
+void initMesh(const char* filename, float meshScaleX, float meshScaleY, float meshScaleZ, float xPos, float yPos, float zPos, float xRot, float yRot, float zRot)
 {
 	totalConnectedTriangles = 0; 
 	totalConnectedQuads = 0;
@@ -857,10 +951,10 @@ void texBox()
 	}
 
 
-	float picInterval = picDistAbs / textureSliceCount[textureToLoad3D];
+	float picInterval = picDistAbs / textureSliceCount[gpuTextureLocation];
 
 	glEnable(GL_TEXTURE_3D);
-	glBindTexture(GL_TEXTURE_3D, textureID3D[textureToLoad3D]);
+	glBindTexture(GL_TEXTURE_3D, textureID3D[gpuTextureLocation]);
 
 	float textureSquareLoc = picDistAbs/2;
 	if(!invertImages)
@@ -901,47 +995,46 @@ void texBox()
 	glNormal3d(0, 0, 1);
 		if(displayMethod == 't') //Trauncated (No interpolation)
 		{
-			glTexCoord3f(1,-0,((int)textureSquareLoc/(float)textureSliceCount[textureToLoad3D]+ofTesting1));		glVertex3f( screenWidthCm,-screenHeightCm,-2*screenHeightCm+.01); 
-			glTexCoord3f(1,1, ((int)textureSquareLoc/(float)textureSliceCount[textureToLoad3D]+ofTesting1));		glVertex3f( screenWidthCm, screenHeightCm,-2*screenHeightCm+.01);  
-			glTexCoord3f(0,1, ((int)textureSquareLoc/(float)textureSliceCount[textureToLoad3D]+ofTesting1));		glVertex3f(-screenWidthCm, screenHeightCm,-2*screenHeightCm+.01);
-			glTexCoord3f(0,-0,((int)textureSquareLoc/(float)textureSliceCount[textureToLoad3D]+ofTesting1));		glVertex3f(-screenWidthCm,-screenHeightCm,-2*screenHeightCm+.01);
+			glTexCoord3f(1,-0,((int)textureSquareLoc/(float)textureSliceCount[gpuTextureLocation]+ofTesting1));		glVertex3f( screenWidthCm,-screenHeightCm,-2*screenHeightCm+.01); 
+			glTexCoord3f(1,1, ((int)textureSquareLoc/(float)textureSliceCount[gpuTextureLocation]+ofTesting1));		glVertex3f( screenWidthCm, screenHeightCm,-2*screenHeightCm+.01);  
+			glTexCoord3f(0,1, ((int)textureSquareLoc/(float)textureSliceCount[gpuTextureLocation]+ofTesting1));		glVertex3f(-screenWidthCm, screenHeightCm,-2*screenHeightCm+.01);
+			glTexCoord3f(0,-0,((int)textureSquareLoc/(float)textureSliceCount[gpuTextureLocation]+ofTesting1));		glVertex3f(-screenWidthCm,-screenHeightCm,-2*screenHeightCm+.01);
 		}
 		else if(displayMethod == 'r') // Rotation
 		{
 			glLoadIdentity();
 			glRotatef(rotationX, 1,0,0);
 			glRotatef(rotationY, 0,1,0);
-			glTexCoord3f(1,0,textureSquareLoc/(float)textureSliceCount[textureToLoad3D]+ofTesting1);		glVertex3f( screenWidthCm,-screenHeightCm,-2*screenHeightCm+.01); 
-			glTexCoord3f(1,1,textureSquareLoc/(float)textureSliceCount[textureToLoad3D]+ofTesting1);		glVertex3f( screenWidthCm, screenHeightCm,-2*screenHeightCm+.01);  
-			glTexCoord3f(0,1,textureSquareLoc/(float)textureSliceCount[textureToLoad3D]+ofTesting1);		glVertex3f(-screenWidthCm, screenHeightCm,-2*screenHeightCm+.01);
-			glTexCoord3f(0,0,textureSquareLoc/(float)textureSliceCount[textureToLoad3D]+ofTesting1);		glVertex3f(-screenWidthCm,-screenHeightCm,-2*screenHeightCm+.01);
+			glTexCoord3f(1,0,textureSquareLoc/(float)textureSliceCount[gpuTextureLocation]+ofTesting1);		glVertex3f( screenWidthCm,-screenHeightCm,-2*screenHeightCm+.01); 
+			glTexCoord3f(1,1,textureSquareLoc/(float)textureSliceCount[gpuTextureLocation]+ofTesting1);		glVertex3f( screenWidthCm, screenHeightCm,-2*screenHeightCm+.01);  
+			glTexCoord3f(0,1,textureSquareLoc/(float)textureSliceCount[gpuTextureLocation]+ofTesting1);		glVertex3f(-screenWidthCm, screenHeightCm,-2*screenHeightCm+.01);
+			glTexCoord3f(0,0,textureSquareLoc/(float)textureSliceCount[gpuTextureLocation]+ofTesting1);		glVertex3f(-screenWidthCm,-screenHeightCm,-2*screenHeightCm+.01);
 		}
-		else if (displayMethod == 'n') //Normal
+		else if (displayMethod == 'c') //Centered distortion
 		{
-			glTexCoord3f(1,-0,(textureSquareLoc/(float)textureSliceCount[textureToLoad3D]+ofTesting1));		glVertex3f( screenWidthCm,-screenHeightCm,-2*screenHeightCm+.01); 
-			glTexCoord3f(1,1, (textureSquareLoc/(float)textureSliceCount[textureToLoad3D]+ofTesting1));		glVertex3f( screenWidthCm, screenHeightCm,-2*screenHeightCm+.01);  
-			glTexCoord3f(0,1, (textureSquareLoc/(float)textureSliceCount[textureToLoad3D]+ofTesting1));		glVertex3f(-screenWidthCm, screenHeightCm,-2*screenHeightCm+.01);
-			glTexCoord3f(0,-0,(textureSquareLoc/(float)textureSliceCount[textureToLoad3D]+ofTesting1));		glVertex3f(-screenWidthCm,-screenHeightCm,-2*screenHeightCm+.01);
+			glTexCoord3f(1,0,(textureSquareLoc/(float)textureSliceCount[gpuTextureLocation])+rotationX/100.0);		glVertex3f( screenWidthCm,-screenHeightCm,-2*screenHeightCm+.01); 
+			glTexCoord3f(1,1,(textureSquareLoc/(float)textureSliceCount[gpuTextureLocation])+rotationX/100.0);		glVertex3f( screenWidthCm, screenHeightCm,-2*screenHeightCm+.01);  
+			glTexCoord3f(0,1,(textureSquareLoc/(float)textureSliceCount[gpuTextureLocation])-rotationX/100.0);		glVertex3f(-screenWidthCm, screenHeightCm,-2*screenHeightCm+.01);
+			glTexCoord3f(0,0,(textureSquareLoc/(float)textureSliceCount[gpuTextureLocation])-rotationX/100.0);		glVertex3f(-screenWidthCm,-screenHeightCm,-2*screenHeightCm+.01);
 		}
-		else if(displayMethod == 'a') //Test one side rotation
+		else if(displayMethod == 'a') //Test one side distortion
 		{
-			glTexCoord3f(1,0,(textureSquareLoc/(float)textureSliceCount[textureToLoad3D])+rotationX/50.0);		glVertex3f( screenWidthCm,-screenHeightCm,-2*screenHeightCm+.01); 
-			glTexCoord3f(1,1,(textureSquareLoc/(float)textureSliceCount[textureToLoad3D])+rotationX/50.0);		glVertex3f( screenWidthCm, screenHeightCm,-2*screenHeightCm+.01);  
-			glTexCoord3f(0,1,(textureSquareLoc/(float)textureSliceCount[textureToLoad3D]));		glVertex3f(-screenWidthCm, screenHeightCm,-2*screenHeightCm+.01);
-			glTexCoord3f(0,0,(textureSquareLoc/(float)textureSliceCount[textureToLoad3D]));		glVertex3f(-screenWidthCm,-screenHeightCm,-2*screenHeightCm+.01);
+			glTexCoord3f(1,0,(textureSquareLoc/(float)textureSliceCount[gpuTextureLocation])+rotationX/50.0);		glVertex3f( screenWidthCm,-screenHeightCm,-2*screenHeightCm+.01); 
+			glTexCoord3f(1,1,(textureSquareLoc/(float)textureSliceCount[gpuTextureLocation])+rotationX/50.0);		glVertex3f( screenWidthCm, screenHeightCm,-2*screenHeightCm+.01);  
+			glTexCoord3f(0,1,(textureSquareLoc/(float)textureSliceCount[gpuTextureLocation]));		glVertex3f(-screenWidthCm, screenHeightCm,-2*screenHeightCm+.01);
+			glTexCoord3f(0,0,(textureSquareLoc/(float)textureSliceCount[gpuTextureLocation]));		glVertex3f(-screenWidthCm,-screenHeightCm,-2*screenHeightCm+.01);
 		}
-		else //Test centered rotation
+		else //Normal
 		{
-			glTexCoord3f(1,0,(textureSquareLoc/(float)textureSliceCount[textureToLoad3D])+rotationX/100.0);		glVertex3f( screenWidthCm,-screenHeightCm,-2*screenHeightCm+.01); 
-			glTexCoord3f(1,1,(textureSquareLoc/(float)textureSliceCount[textureToLoad3D])+rotationX/100.0);		glVertex3f( screenWidthCm, screenHeightCm,-2*screenHeightCm+.01);  
-			glTexCoord3f(0,1,(textureSquareLoc/(float)textureSliceCount[textureToLoad3D])-rotationX/100.0);		glVertex3f(-screenWidthCm, screenHeightCm,-2*screenHeightCm+.01);
-			glTexCoord3f(0,0,(textureSquareLoc/(float)textureSliceCount[textureToLoad3D])-rotationX/100.0);		glVertex3f(-screenWidthCm,-screenHeightCm,-2*screenHeightCm+.01);
+			glTexCoord3f(1,-0,(textureSquareLoc/(float)textureSliceCount[gpuTextureLocation]+ofTesting1));		glVertex3f( screenWidthCm,-screenHeightCm,-2*screenHeightCm+.01); 
+			glTexCoord3f(1,1, (textureSquareLoc/(float)textureSliceCount[gpuTextureLocation]+ofTesting1));		glVertex3f( screenWidthCm, screenHeightCm,-2*screenHeightCm+.01);  
+			glTexCoord3f(0,1, (textureSquareLoc/(float)textureSliceCount[gpuTextureLocation]+ofTesting1));		glVertex3f(-screenWidthCm, screenHeightCm,-2*screenHeightCm+.01);
+			glTexCoord3f(0,-0,(textureSquareLoc/(float)textureSliceCount[gpuTextureLocation]+ofTesting1));		glVertex3f(-screenWidthCm,-screenHeightCm,-2*screenHeightCm+.01);
 		}
 
 	glEnd();
 	glDisable(GL_TEXTURE_3D);
 	glPopMatrix(); 
-	//Temporary until I reverse the image loader
 	if(isFirstEye) //Assumes point given by the kinect is perfectly in between two eyes
 	{
 		worldHeadLoc[X] += 2*eyeDistCm;
@@ -1199,14 +1292,7 @@ void keyboard (unsigned char key, int x, int y)
 			glutPostRedisplay();  
 			break;
 		case 8:
-			if(textureToLoad3D >= num3DTexturesVRAM - 1)
-			{
-				textureToLoad3D = 0;
-			}
-			else
-			{
-				textureToLoad3D ++;
-			}
+			changeTexture();
 			break;
 		//Update screen type and size
 		case 127:
@@ -1227,11 +1313,18 @@ void keyboard (unsigned char key, int x, int y)
 		default :  printf ("   key = %c -> %d\n", key, key);
    }
 }
-
+void createRightClickMenu();
 void menu(int menuItemID)
 {
 	switch(menuItemID)
 	{
+		case 0:
+			cout << "unfinished";
+			//glutDestroyMenu(menu);
+			loadParams();
+			init();
+			createRightClickMenu();
+			break;
 		case 1:
 			cout << "xpos = " << xpos << endl; 
 			cout << "ypos = " << ypos << endl;
@@ -1314,25 +1407,104 @@ void menu(int menuItemID)
 			}
 			break;
 		//Would be cool to add programtically 
-		case 15:
-			if(textureToLoad3D >= num3DTexturesVRAM - 1)
-			{
-				textureToLoad3D = 0;
-			}
-			else
-			{
-				textureToLoad3D ++;
-			}
-			break;
+
 		//Do based on a submenu 
 		//Update screen type and size
+		case 15:
+			whichDisplayType = 2;
+			setScreenSize();
+			break;
 		case 16:
+			whichDisplayType = 0;
 			setScreenSize();
 			break;
 		case 17:
-			cout << "Not Added";
+			whichDisplayType = 1;
+			setScreenSize();
+			break;
+		case 18: //Normal
+			displayMethod = 'n';
+			break;
+		case 19: //Truncate
+			displayMethod = 't';
+			break;
+		case 20: //Rotate
+			displayMethod = 'r';
+			break;
+		case 21: //Distort center
+			displayMethod = 'c';
+			break;
+		case 22: //Distort side
+			displayMethod = 'a';
+			break;
+		default:
+			int textureWanted = menuItemID - 23;
+			int textureCurrent;
+			if(textureToLoad3D != 0)
+			{
+				textureCurrent = (textureToLoad3D - ((num3DTexturesVRAM) - gpuTextureLocation));
+			}
+			else
+			{
+				textureCurrent = (num3DTexturesTotal - ((num3DTexturesVRAM) - gpuTextureLocation));
+			}
+			if(textureWanted - textureCurrent > 0)
+			{
+				for(int i = 0; i < textureWanted - textureCurrent; i++)
+				{
+					changeTexture();
+				}
+			}
+			else 
+			{
+				for(int i = 0; i < num3DTexturesTotal - abs(textureWanted - textureCurrent); i++)
+				{
+					changeTexture();
+				}
+			}
 			break;
 	}
+}
+void createRightClickMenu()
+{
+	int screnTypeSubmenu = glutCreateMenu(menu);
+	glutAddMenuEntry("Active", 15);
+	glutAddMenuEntry("Passive (Left Right)", 16);
+	glutAddMenuEntry("Passive (Top Bottom)", 17);
+
+	int textureDisplaySubmenu = glutCreateMenu(menu);
+	glutAddMenuEntry("Default", 18);
+	glutAddMenuEntry("Truncate", 19);
+	glutAddMenuEntry("Rotate", 20);
+	glutAddMenuEntry("Distort Center", 21);
+	glutAddMenuEntry("Distort off axis", 22);
+
+	int textureMenu = glutCreateMenu(menu);
+	for(int i = 0; i < num3DTexturesTotal; i++)
+	{
+		glutAddMenuEntry(textureLocations[i].c_str(), 23+i);
+	}
+
+	glutCreateMenu(menu);
+	glutAddMenuEntry("Reload Load Parameters", 0);
+	glutAddMenuEntry("Print Basic Variables", 1);
+	glutAddMenuEntry("Invert Eyes", 2);
+	glutAddMenuEntry("Invert Textures", 3);
+	glutAddMenuEntry("3D Tracking", 4);
+	glutAddMenuEntry("Draw Reference Point", 5);
+	glutAddMenuEntry("Update Kinect Data", 6);
+	glutAddMenuEntry("Display HUD", 7);
+	glutAddMenuEntry("Draw Textures", 8);
+	glutAddMenuEntry("Draw Spheres", 9);
+	glutAddMenuEntry("Draw Mesh", 10);
+	glutAddMenuEntry("Increase Scale", 11);
+	glutAddMenuEntry("Decrease Scale", 12);
+	glutAddMenuEntry("Fullscreen", 13);
+	glutAddMenuEntry("Toggle 3D", 14);
+	glutAddSubMenu("Change Screen Type", screnTypeSubmenu); //Make Submenu
+	glutAddSubMenu("How To Display Textures", textureDisplaySubmenu); //Make Submenu
+	glutAddSubMenu("Change Texture", textureMenu); //Make Submenu
+	glutAttachMenu(GLUT_RIGHT_BUTTON);
 }
 
 void display()
@@ -1564,30 +1736,34 @@ void init()
 		exit(0);
 
 	}
-	
+
+	cout << "Loading Mesh" << endl;
+	initMesh(meshPath.c_str(), 30, 60, 30, 0, 30, 0, 90, 0, 0);	
 
 	textureID3D = new GLuint[num3DTexturesVRAM];
-
-	textureLocations = new string[num3DTexturesTotal];
-	textureSliceCount = new int[num3DTexturesTotal];
 
 	//glPixelStorei(GL_UNPACK_ALIGNMENT,1);
 	glGenTextures(num3DTexturesVRAM, textureID3D);
 
 	cout << "Loading Textures" << endl;	
+
+	for(int i = 0; i < num3DTexturesVRAM; i++) //Only load in as many textures to start as told to hold
+	{
+		initTexturesBmp(textureLocations[i], textureSliceCount[i]);
+	}
 	
 	//initTexturesBmp("textures\\v2_s\\v2_s", 78, ' '); //forScience
 	//initTexturesBmp("textures\\v2_s\\v2_s", 78, 'r');
 
 	//initTexturesBmp("textures\\v2_xpos\\v2_xpos", 340, ' ');
 	
-	initTexturesBmp("textures\\v2_s\\v2_s", 78);
-	initTexturesBmp("textures\\xpos\\xpos", 35);
-	initTexturesBmp("textures\\v2_s_Dreduced\\v2_s", 20);
+	//initTexturesBmp("textures\\v2_s\\v2_s", 78);
+	//initTexturesBmp("textures\\xpos\\xpos", 35);
+	//initTexturesBmp("textures\\v2_s_Dreduced\\v2_s", 20);
 
-	initTexturesBmp("textures\\v2_s\\v2_s", 78);
-	initTexturesBmp("textures\\v2_s_reduced\\v2_s", 39);
-	initTexturesBmp("textures\\v2_s_Dreduced\\v2_s", 20);
+	//initTexturesBmp("textures\\v2_s\\v2_s", 78);
+	//initTexturesBmp("textures\\v2_s_reduced\\v2_s", 39);
+	//initTexturesBmp("textures\\v2_s_Dreduced\\v2_s", 20);
 	
 	//initTexturesBmp("textures\\v2_s\\v2_s", 78, 'a');
 	//initTexturesBmp("textures\\v2_xpos\\v2_xpos", 340, 'x');
@@ -1600,10 +1776,7 @@ void init()
 	//initTexturesBmp("textures\\v2_xpos\\v2_xpos", 340);
 	//initMesh("meshes\\xyzrgb_statuette_simplify.ply", 9, 15.5, 8, 5, -5.35, 17, 0, 0, 0);
 
-	cout << "Loading Mesh" << endl;
-	initMesh("meshes\\xyzrgb_statuette_simplify.ply", 30, 60, 30, 0, 30, 0, 90, 0, 0);
-
-	textureToLoad3D = 0;
+	gpuTextureLocation = 0;
 }
 
 
@@ -1639,27 +1812,13 @@ int main(int argc, char** argv)
 		//otherwise comment glutPost and set this to display. 
 		//At some point I will also try to get glutTimerFunc working again
 		glutIdleFunc(display);
+
+
 		
+		loadParams();
+		init();
 		
-		glutCreateMenu(menu);
-		glutAddMenuEntry("Print Basic Variables", 1);
-		glutAddMenuEntry("Invert Eyes", 2);
-		glutAddMenuEntry("Invert Textures", 3);
-		glutAddMenuEntry("3D Tracking", 4);
-		glutAddMenuEntry("Draw Reference Point", 5);
-		glutAddMenuEntry("Update Kinect Data", 6);
-		glutAddMenuEntry("Display HUD", 7);
-		glutAddMenuEntry("Draw Textures", 8);
-		glutAddMenuEntry("Draw Spheres", 9);
-		glutAddMenuEntry("Draw Mesh", 10);
-		glutAddMenuEntry("Increase Scale", 11);
-		glutAddMenuEntry("Decrease Scale", 12);
-		glutAddMenuEntry("Fullscreen", 13);
-		glutAddMenuEntry("Toggle 3D", 14);
-		glutAddMenuEntry("Change Texture", 15); //Make Submenu
-		glutAddMenuEntry("Change Screen Type", 16); //Make Submenu
-		glutAddMenuEntry("How To Display Textures", 17); //Make Submenu
-		glutAttachMenu(GLUT_RIGHT_BUTTON);
+		createRightClickMenu();
 
 		GLboolean stereo = 0;
 
@@ -1675,9 +1834,6 @@ int main(int argc, char** argv)
 			cout << "Stereo not supported :(" << endl;
 		}
 		cout << "current renderer being used is: " << glGetString(GL_RENDERER) << endl;
-		
-		loadParams();
-		init();
 
 	}
 	catch(exception e)
