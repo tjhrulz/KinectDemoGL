@@ -53,6 +53,7 @@ const int MIN = 0;
 const int MAX = 3;
 
 
+//Many of these vars are redeifned when file is imported, the are used to make the base file
 // Camera Postition Vars
 float xpos = 0.0; 
 float ypos = 0.0;
@@ -186,7 +187,7 @@ float picRotAbs = 39;
 
 
 
-bool stringToBool(string booleanValue)
+bool stringToBool(string booleanValue) //Since there is no string to bool conversion I wrote a quick and dirty method to do it
 {
 	//True superceds false did a few tests just in case
 	if(booleanValue.front() == 't' || booleanValue.find("true") != -1 || atoi(booleanValue.c_str()) == 1)
@@ -205,7 +206,7 @@ bool stringToBool(string booleanValue)
 	}
 }
 
-string boolToString(bool boolean)
+string boolToString(bool boolean) //For file output so that bools are not 1s and 0s
 {
 	if(boolean)
 	{
@@ -217,7 +218,7 @@ string boolToString(bool boolean)
 	}
 }
 
-string convertDisplayType(int whichDisplayType)
+string convertDisplayType(int whichDisplayType) //Change display type which is stored as an int to string
 {
 	if(whichDisplayType == 0)
 	{
@@ -239,7 +240,7 @@ string convertDisplayType(int whichDisplayType)
 	}
 }
 
-int convertDisplayType(string whichDisplayType)
+int convertDisplayType(string whichDisplayType) //Take display type string and convert it to correct integer
 {
 	if(whichDisplayType.find("active") != -1 || atoi(whichDisplayType.c_str()) == 0)
 	{
@@ -260,7 +261,7 @@ int convertDisplayType(string whichDisplayType)
 	}
 }
 
-string parseString(string data)
+string parseString(string data) //Prase file locations so they are more user readable
 {
 	for(int i = 0; i < data.length()-1; i++)
 	{
@@ -277,13 +278,13 @@ string parseString(string data)
 	return data;
 }
 
-void init();
-void loadParams()
+void init();//Predefine my init for use up here
+void loadParams() //This function is used to get loadParameters.txt to define var different from what they were at build time 
 {
 	string buffer;
 
 	ifstream loadInstructions ("loadInstructions.txt");
-	if (loadInstructions.is_open())
+	if (loadInstructions.is_open()) //The file exists and we shall load vars from it
 	{
 		/*
 		getline(loadInstructions, buffer);
@@ -378,7 +379,7 @@ void loadParams()
 
 		loadInstructions.close();
 	}
-	else 
+	else //File doesnt exist make one
 	{
 		ofstream writeInstructions ("loadInstructions.txt");
 		if(writeInstructions.is_open())
@@ -429,16 +430,15 @@ void loadParams()
 
 			writeInstructions.close();
 		}
-		else
+		else //File doesnt exist and we couldnt make one, just use what vars the program was built with alert the user and move on
 		{
 			cout << "Something went wrong loading/writing the file likely it is read/write locked";
 			system("pause");
-			exit(0);
 		}
 	}
 }
 
-bool initKinect() 
+bool initKinect() //Initialze the kinect according to what the kinect documatation specifies
 {
     // Get a working kinect sensor
     int numSensors;
@@ -462,16 +462,16 @@ bool initKinect()
     return true;
 }
 
-void getSkeletalData() 
+void getSkeletalData() //Update data from kinect
 {	
  	if(sensor) //Prevent crashes
 	{
 		NUI_SKELETON_FRAME skeletonFrame = {0};
-		if (sensor->NuiSkeletonGetNextFrame(0, &skeletonFrame) >= 0) 
+		if (sensor->NuiSkeletonGetNextFrame(0, &skeletonFrame) >= 0) //Only grab what we care about 
 		{	
 			sensor->NuiTransformSmooth(&skeletonFrame, NULL);
 			// Loop over all sensed skeletons
-			for (int z = 0; z < NUI_SKELETON_COUNT; ++z) 
+			for (int z = 0; z < NUI_SKELETON_COUNT; ++z)
 			{
 				const NUI_SKELETON_DATA& skeleton = skeletonFrame.SkeletonData[z];
 				// Check the state of the skeleton
@@ -490,9 +490,9 @@ void getSkeletalData()
 		}
 	}
 }
-void initTexturesBmp(string baseFileName, int textureCount, int textureIncrement)
+void initTexturesBmp(string baseFileName, int textureCount, int textureIncrement) //load in a series of textures into a 3D texture buffer these should be formated as binary .bmp's
 {
-	if(textureBuffer3Dsupported)
+	if(textureBuffer3Dsupported) //If the GPU supports 3D texture spaces
 	{
 		char * textureData3D;
 		int textureWidth3D;
@@ -504,7 +504,7 @@ void initTexturesBmp(string baseFileName, int textureCount, int textureIncrement
 		long long int imageSize3D = textureCount;
 
 
-		while(textureToLoad < textureCount)
+		while(textureToLoad < textureCount) //Loop through all textures specified to load in
 		{
 			string fileName = baseFileName + " (" + to_string(static_cast<long long>(textureIncrement*textureToLoad+1)) + ").bmp";	//Take the base image name and add on the counting system which is image (x+1).bmp (Easy to rename on widows like that
 			//Right now this is hard coded until I can figure out a platform agnostic way to programatically get the name of every image in a folder		
@@ -540,7 +540,8 @@ void initTexturesBmp(string baseFileName, int textureCount, int textureIncrement
 			char *textureDataTemp = new char [imageSize2D];
 			fread(textureDataTemp,1,imageSize2D,file); //Load in the data from the image to appropriate array location
 
-	//		fread((textureData3D + imageSize2D * textureToLoad),1,imageSize2D,file); //Load in the data from the image to appropriate array location
+			//Need to figure out a better way to load in the data without a bad array copy
+			//fread((textureData3D + imageSize2D * textureToLoad),1,imageSize2D,file); //Load in the data from the image to appropriate array location
 
 			//memcpy(textureData3D + sizeof(char *) * textureToLoad, textureDataTemp, sizeof(textureDataTemp)); 
 			for(int i = 0; i < imageSize2D; i++)
@@ -600,7 +601,7 @@ void initTexturesBmp(string baseFileName, int textureCount, int textureIncrement
 	}
 }
 
-void changeTexture()
+void changeTexture() //Swtich texture to next texture will be called multiple times if a specfic one is specified
 {
 	if(gpuTextureLocation >= num3DTexturesVRAM - 1)
 	{
@@ -628,7 +629,7 @@ void changeTexture()
 }
 
 
-float* calculateNormal( float *coord1, float *coord2, float *coord3 )
+float* calculateNormal( float *coord1, float *coord2, float *coord3 ) //Calculate the normal to the triangle
 {
    //calculate Vector1 and Vector2
    float va[3], vb[3], vr[3], val;
@@ -657,7 +658,7 @@ float* calculateNormal( float *coord1, float *coord2, float *coord3 )
 	return norm;
 }
 
-void initMesh(const char* filename, float meshScaleX, float meshScaleY, float meshScaleZ, float xPos, float yPos, float zPos, float xRot, float yRot, float zRot)
+void initMesh(const char* filename, float meshScaleX, float meshScaleY, float meshScaleZ, float xPos, float yPos, float zPos, float xRot, float yRot, float zRot) //Load in the mesh rot and pos not user defined....yet
 {
 	totalConnectedTriangles = 0; 
 	totalConnectedQuads = 0;
@@ -834,7 +835,7 @@ void initMesh(const char* filename, float meshScaleX, float meshScaleY, float me
 }
 
  
-void drawMesh()
+void drawMesh() //Actually draw the mesh, mesh scaling rot and translation is done here
 {
 	glPushMatrix();	
 
@@ -880,7 +881,7 @@ void drawMesh()
 }
 
 
-void spheres()
+void spheres() //Draw a series of text spheres
 {
 	glPushMatrix();
 	glTranslatef(0,0,-screenHeightCm); //Draw blue centered instead of green
@@ -946,7 +947,7 @@ void spheres()
 	glPopMatrix(); 
 }
 
-void texBox()
+void texBox()//Draw the rectangle which the textures are applied to
 {
 	glPushMatrix();
 	glTranslatef(0,0,2*screenHeightCm); //Set to end at screen
@@ -1001,7 +1002,7 @@ void texBox()
 		
 	//glTexImage3D(GL_TEXTURE_3D, 0,GL_INTENSITY, textureWidth3D, textureHeight3D,TEXTURECOUNT,0, GL_BGR_EXT,GL_UNSIGNED_BYTE,textureData3D);
 		
-		switch(displayMethod)
+		switch(displayMethod) //chose which texture to load, how to load it, and how to draw the rectangle 
 		{
 			case 't': //Trauncated (No interpolation)
 			{	
@@ -1136,10 +1137,8 @@ void calculateFPS()
     }
 }
 
-void setScreenSize()
+void setScreenSize() //chose which display type, a bit hacky
 {
-	//New code for dynamic screen size (call whenever screen type and size needs to be changed)
-	
 	if(initCompleted) //If not first time pass then increment and set
 	{
 		if(whichDisplayType < 2)
@@ -1176,7 +1175,7 @@ void setScreenSize()
 	lightPosition[2] = 10*screenHeightCm;
 }
 
-void keyboard (unsigned char key, int x, int y) 
+void keyboard (unsigned char key, int x, int y) //Long list of keyboard commands
 {
  
 	switch (key) 
@@ -1383,7 +1382,7 @@ void keyboard (unsigned char key, int x, int y)
    }
 }
 void createRightClickMenu();
-void menu(int menuItemID)
+void menu(int menuItemID) //What to do fo each of the items in the menu
 {
 	switch(menuItemID)
 	{
@@ -1535,7 +1534,7 @@ void menu(int menuItemID)
 			break;
 	}
 }
-void createRightClickMenu()
+void createRightClickMenu() //Define what goes in the right click menu
 {
 	int screnTypeSubmenu = glutCreateMenu(menu);
 	glutAddMenuEntry("Active", 15);
@@ -1578,7 +1577,7 @@ void createRightClickMenu()
 	glutAttachMenu(GLUT_RIGHT_BUTTON);
 }
 
-void display()
+void display() //GL screen update
 {
 	float nearPlane = .1;
     glMatrixMode(GL_MODELVIEW);
